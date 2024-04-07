@@ -5,22 +5,21 @@ import ContextMenu from 'react-native-context-menu-view'
 import { FadeIn, FadeInDown, FadeOutDown } from 'react-native-reanimated'
 import { useAppSelector } from 'src/app/hooks'
 import { AppStackScreenProp } from 'src/app/navigation/types'
-import { HeaderScrollScreen } from 'src/components/layout/screens/HeaderScrollScreen'
-import { Loader } from 'src/components/loading'
 import { PriceExplorer } from 'src/components/PriceExplorer/PriceExplorer'
 import { useTokenPriceHistory } from 'src/components/PriceExplorer/usePriceHistory'
-import { useCrossChainBalances } from 'src/components/TokenDetails/hooks'
 import { TokenBalances } from 'src/components/TokenDetails/TokenBalances'
 import { TokenDetailsActionButtons } from 'src/components/TokenDetails/TokenDetailsActionButtons'
 import { TokenDetailsFavoriteButton } from 'src/components/TokenDetails/TokenDetailsFavoriteButton'
 import { TokenDetailsHeader } from 'src/components/TokenDetails/TokenDetailsHeader'
 import { TokenDetailsLinks } from 'src/components/TokenDetails/TokenDetailsLinks'
 import { TokenDetailsStats } from 'src/components/TokenDetails/TokenDetailsStats'
+import { useCrossChainBalances } from 'src/components/TokenDetails/hooks'
 import Trace from 'src/components/Trace/Trace'
+import { HeaderScrollScreen } from 'src/components/layout/screens/HeaderScrollScreen'
+import { Loader } from 'src/components/loading'
 import { useTokenContextMenu } from 'src/features/balances/hooks'
 import { selectModalState } from 'src/features/modals/selectModalState'
 import { useNavigateToSend } from 'src/features/send/hooks'
-import { useNavigateToSwap } from 'src/features/swap/hooks'
 import { Screens } from 'src/screens/Screens'
 import { disableOnPress } from 'src/utils/disableOnPress'
 import { useSkeletonLoading } from 'src/utils/useSkeletonLoading'
@@ -36,28 +35,29 @@ import {
 } from 'ui/src'
 import EllipsisIcon from 'ui/src/assets/icons/ellipsis.svg'
 import { fonts, iconSizes, spacing } from 'ui/src/theme'
+import { useExtractedTokenColor } from 'ui/src/utils/colors'
+import {
+  SafetyLevel,
+  TokenDetailsScreenQuery,
+  useTokenDetailsScreenQuery,
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
+import { PortfolioBalance } from 'uniswap/src/features/dataApi/types'
 import { NumberType } from 'utilities/src/format/types'
 import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
 import { TokenLogo } from 'wallet/src/components/CurrencyLogo/TokenLogo'
 import { ChainId } from 'wallet/src/constants/chains'
 import { PollingInterval } from 'wallet/src/constants/misc'
+import { useWalletNavigation } from 'wallet/src/contexts/WalletNavigationContext'
 import { isError, isNonPollingRequestInFlight } from 'wallet/src/data/utils'
-import {
-  SafetyLevel,
-  TokenDetailsScreenQuery,
-  useTokenDetailsScreenQuery,
-} from 'wallet/src/data/__generated__/types-and-hooks'
 import { fromGraphQLChain } from 'wallet/src/features/chains/utils'
-import { PortfolioBalance } from 'wallet/src/features/dataApi/types'
 import { currencyIdToContractInput } from 'wallet/src/features/dataApi/utils'
+import { useLocalizationContext } from 'wallet/src/features/language/LocalizationContext'
 import { Language } from 'wallet/src/features/language/constants'
 import { useCurrentLanguage } from 'wallet/src/features/language/hooks'
-import { useLocalizationContext } from 'wallet/src/features/language/LocalizationContext'
-import { useTokenWarningDismissed } from 'wallet/src/features/tokens/safetyHooks'
 import TokenWarningModal from 'wallet/src/features/tokens/TokenWarningModal'
+import { useTokenWarningDismissed } from 'wallet/src/features/tokens/safetyHooks'
 import { CurrencyField } from 'wallet/src/features/transactions/transactionState/types'
 import { ModalName } from 'wallet/src/telemetry/constants'
-import { useExtractedTokenColor } from 'wallet/src/utils/colors'
 import { currencyIdToAddress, currencyIdToChain } from 'wallet/src/utils/currencyId'
 
 function HeaderTitleElement({
@@ -96,7 +96,7 @@ function HeaderTitleElement({
           url={logo}
         />
         <Text color="$neutral2" numberOfLines={1} variant="buttonLabel4">
-          {symbol ?? t('Unknown token')}
+          {symbol ?? t('token.error.unknown')}
         </Text>
       </Flex>
     </Flex>
@@ -105,11 +105,10 @@ function HeaderTitleElement({
 
 export function TokenDetailsScreen({
   route,
-  navigation,
 }: AppStackScreenProp<Screens.TokenDetails>): JSX.Element {
   const { currencyId: _currencyId } = route.params
   // Potentially delays loading of perf-heavy content to speed up navigation
-  const showSkeleton = useSkeletonLoading(navigation)
+  const showSkeleton = useSkeletonLoading()
   const language = useCurrentLanguage()
 
   // Token details screen query
@@ -215,7 +214,7 @@ function TokenDetails({
     retry()
   }, [error, retry])
 
-  const navigateToSwap = useNavigateToSwap()
+  const { navigateToSwapFlow } = useWalletNavigation()
   const navigateToSend = useNavigateToSend()
 
   // set if attempting buy or sell, use for warning modal
@@ -238,10 +237,10 @@ function TokenDetails({
         setShowWarningModal(true)
       } else {
         setActiveTransactionType(undefined)
-        navigateToSwap(currencyField, currencyAddress, currencyChainId)
+        navigateToSwapFlow({ currencyField, currencyAddress, currencyChainId })
       }
     },
-    [currencyAddress, currencyChainId, navigateToSwap, safetyLevel, tokenWarningDismissed]
+    [currencyAddress, currencyChainId, navigateToSwapFlow, safetyLevel, tokenWarningDismissed]
   )
 
   const onPressSend = useCallback(() => {
@@ -253,14 +252,14 @@ function TokenDetails({
     dismissWarningCallback()
     setShowWarningModal(false)
     if (activeTransactionType !== undefined) {
-      navigateToSwap(activeTransactionType, currencyAddress, currencyChainId)
+      navigateToSwapFlow({ currencyField: activeTransactionType, currencyAddress, currencyChainId })
     }
   }, [
     activeTransactionType,
     currencyAddress,
     currencyChainId,
     dismissWarningCallback,
-    navigateToSwap,
+    navigateToSwapFlow,
   ])
 
   const inModal = useAppSelector(selectModalState(ModalName.Explore)).isOpen

@@ -6,12 +6,8 @@ exports[`EmptyState renders without error 1`] = `
     {
       "alignItems": "center",
       "flexDirection": "column",
-      "gap": 24,
+      "gap": 16,
       "justifyContent": "center",
-      "paddingBottom": 12,
-      "paddingLeft": 12,
-      "paddingRight": 12,
-      "paddingTop": 12,
       "width": "100%",
     }
   }
@@ -21,7 +17,7 @@ exports[`EmptyState renders without error 1`] = `
       {
         "alignItems": "center",
         "flexDirection": "column",
-        "gap": 16,
+        "gap": 8,
         "justifyContent": "center",
       }
     }
@@ -57,7 +53,6 @@ exports[`EmptyState renders without error 1`] = `
   <View
     style={
       {
-        "alignItems": "stretch",
         "flexDirection": "row",
         "gap": 16,
       }
@@ -124,7 +119,6 @@ exports[`ErrorState renders without error 1`] = `
   <View
     style={
       {
-        "alignItems": "stretch",
         "flexDirection": "row",
       }
     }
@@ -134,51 +128,34 @@ exports[`ErrorState renders without error 1`] = `
 
 exports[`Header renders without error 1`] = `
 <View
-  accessibilityState={
-    {
-      "busy": undefined,
-      "checked": undefined,
-      "disabled": undefined,
-      "expanded": undefined,
-      "selected": undefined,
-    }
-  }
-  accessibilityValue={
-    {
-      "max": undefined,
-      "min": undefined,
-      "now": undefined,
-      "text": undefined,
-    }
-  }
-  accessible={true}
-  collapsable={false}
+  cancelable={true}
+  disabled={false}
   focusable={true}
-  hitSlop={
-    {
-      "bottom": 5,
-      "left": 5,
-      "right": 5,
-      "top": 5,
-    }
-  }
-  onClick={[Function]}
-  onResponderGrant={[Function]}
-  onResponderMove={[Function]}
-  onResponderRelease={[Function]}
-  onResponderTerminate={[Function]}
-  onResponderTerminationRequest={[Function]}
-  onStartShouldSetResponder={[Function]}
+  hitSlop={[Function]}
+  minPressDuration={0}
+  onBlur={[Function]}
+  onFocus={[Function]}
+  onMouseEnter={[Function]}
+  onMouseLeave={[Function]}
+  onPress={[Function]}
+  onPressIn={[Function]}
+  onPressOut={[Function]}
   style={
     {
       "borderBottomColor": "#2222220D",
       "borderBottomWidth": 0.25,
       "borderStyle": "solid",
+      "flexDirection": "column",
       "opacity": 1,
       "paddingBottom": 12,
       "paddingLeft": 16,
       "paddingRight": 16,
       "paddingTop": 12,
+      "transform": [
+        {
+          "scale": 1,
+        },
+      ],
     }
   }
 >
@@ -195,7 +172,6 @@ exports[`Header renders without error 1`] = `
     <View
       style={
         {
-          "alignItems": "stretch",
           "flexDirection": "column",
           "gap": 4,
         }
@@ -422,6 +398,7 @@ exports[`InlineErrorState renders without error 1`] = `
     </RNSVGSvgView>
     <Text
       allowFontScaling={true}
+      ellipsizeMode="tail"
       maxFontSizeMultiplier={1.4}
       numberOfLines={1}
       style={
@@ -445,7 +422,6 @@ exports[`Shadow renders without error 1`] = `
 <View
   style={
     {
-      "alignItems": "stretch",
       "backgroundColor": "#FFFFFFff",
       "borderBottomLeftRadius": 16,
       "borderBottomRightRadius": 16,

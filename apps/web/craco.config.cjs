@@ -18,6 +18,9 @@ process.env.REACT_APP_GIT_COMMIT_HASH = commitHash
 // Omit them from production builds, as they slow down the feedback loop.
 const shouldLintOrTypeCheck = !isProduction
 
+// Our .swcrc wasn't being picked up in the monorepo, so we load it directly.
+const swcrc = JSON.parse(readFileSync('./.swcrc', 'utf-8'))
+
 function getCacheDirectory(cacheName) {
   // Include the trailing slash to denote that this is a directory.
   return `${path.join(__dirname, 'node_modules/.cache/', cacheName)}/`
@@ -45,6 +48,9 @@ module.exports = {
   jest: {
     configure(jestConfig) {
       return Object.assign(jestConfig, {
+        globals: {
+          __DEV__: true,
+        },
         cacheDirectory: getCacheDirectory('jest'),
         transform: {
           ...Object.entries(jestConfig.transform).reduce((transform, [key, value]) => {
@@ -54,12 +60,14 @@ module.exports = {
           // Transform vanilla-extract using its own transformer.
           // See https://sandroroth.com/blog/vanilla-extract-cra#jest-transform.
           '\\.css\\.ts$': '@vanilla-extract/jest-transform',
-          '\\.(t|j)sx?$': '@swc/jest',
+          '\\.(t|j)sx?$': ['@swc/jest', swcrc],
         },
         // Use d3-arrays's build directly, as jest does not support its exports.
         transformIgnorePatterns: ['d3-array'],
         moduleNameMapper: {
           'd3-array': 'd3-array/dist/d3-array.min.js',
+          '^react-native$': 'react-native-web',
+          'react-native-gesture-handler': require.resolve('react-native-gesture-handler'),
         },
       })
     },
@@ -114,6 +122,10 @@ module.exports = {
 
       // Configure webpack resolution:
       webpackConfig.resolve = Object.assign(webpackConfig.resolve, {
+        alias: {
+          ...webpackConfig.resolve.alias,
+          'react-native-gesture-handler$': require.resolve('react-native-gesture-handler'),
+        },
         plugins: webpackConfig.resolve.plugins.map((plugin) => {
           // Allow vanilla-extract in production builds.
           // This is necessary because create-react-app guards against external imports.
@@ -141,10 +153,44 @@ module.exports = {
       webpackConfig.module.rules[1].oneOf = webpackConfig.module.rules[1].oneOf.map((rule) => {
         if (rule.loader && rule.loader.match(/babel-loader/)) {
           rule.loader = 'swc-loader'
-          // our .swcrc wasn't being picked up in the monorepo, this is a hacky but working fix
-          rule.options = JSON.parse(readFileSync('./.swcrc', 'utf-8'))
+          rule.options = swcrc
+
+          rule.include = (inPath) => {
+            // if not a node_module we parse with SWC (so other packages in monorepo are importable)
+            return inPath.indexOf('node_modules') === -1
+          }
         }
         return rule
+      })
+
+      // since wallet package uses react-native-dotenv and that needs a babel plugin
+      // adding this before the swc loader
+      webpackConfig.module.rules[1].oneOf.unshift({
+        loader: 'babel-loader',
+        include: (path) => /uniswap\/src.*\.(js|ts)x?$/.test(path),
+        options: {
+          presets: ['module:metro-react-native-babel-preset'],
+          plugins: [
+            [
+              'module:react-native-dotenv',
+              {
+                // ideally use envName here to add a mobile namespace but this doesn't work when sharing with dotenv-webpack
+                moduleName: 'react-native-dotenv',
+                path: '../../.env.defaults', // must use this path so this file can be shared with web since dotenv-webpack is less flexible
+                safe: true,
+                allowUndefined: false,
+              },
+            ],
+          ],
+        },
+      })
+
+      // TODO(WEB-3632): Tamagui linear gradient isn't fully-specified, temporary
+      webpackConfig.module.rules.unshift({
+        test: /\.m?js$/,
+        resolve: {
+          fullySpecified: false,
+        },
       })
 
       // Run terser compression on node_modules before tree-shaking, so that tree-shaking is more effective.

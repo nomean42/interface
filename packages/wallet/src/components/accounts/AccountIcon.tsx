@@ -1,7 +1,9 @@
 import { StyleSheet } from 'react-native'
 import Svg, { Defs, RadialGradient as RadialGradientSVG, Rect, Stop } from 'react-native-svg'
-import { Flex, Icons, Unicon, useUniconColors } from 'ui/src'
+import { ColorTokens, Flex, Icons, Unicon, UniconV2, useUniconColors } from 'ui/src'
 import { spacing } from 'ui/src/theme'
+import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
+import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
 import { RemoteImage } from 'wallet/src/features/images/RemoteImage'
 
 // Determines view only icon size in relation to Account Icon size
@@ -14,6 +16,8 @@ export interface AccountIconProps {
   avatarUri?: string | null
   showBackground?: boolean // Display images with solid background.
   showBorder?: boolean // Display border stroke around image
+  borderWidth?: number
+  borderColor?: ColorTokens
   backgroundPadding?: number
 }
 
@@ -24,6 +28,8 @@ export function AccountIcon({
   avatarUri,
   showBackground,
   showBorder,
+  borderColor = '$surface1',
+  borderWidth = 2,
   backgroundPadding = spacing.spacing12,
 }: AccountIconProps): JSX.Element {
   // add padding to unicon if background is displayed
@@ -37,26 +43,35 @@ export function AccountIcon({
 
   // Color for gradient background.
   const { gradientEnd: uniconColor } = useUniconColors(address)
+  const isUniconsV2Enabled = useFeatureFlag(FeatureFlags.UniconsV2)
 
   const uniconImage = (
-    <Flex centered borderRadius="$roundedFull" height={size} padding={uniconPadding} width={size}>
-      <Unicon address={address} size={uniconSize} />
-      {showBackground ? <UniconGradient color={uniconColor} size={size} /> : null}
-    </Flex>
+    <>
+      {isUniconsV2Enabled ? (
+        <UniconV2 address={address} size={size} />
+      ) : (
+        <Flex centered borderRadius="$roundedFull" height={size} p={uniconPadding} width={size}>
+          <Unicon address={address} size={uniconSize} />
+          {showBackground ? <UniconGradient color={uniconColor} size={size} /> : null}
+        </Flex>
+      )}
+    </>
   )
 
   return (
     <Flex
       backgroundColor={showBackground ? '$surface1' : '$transparent'}
-      borderColor={showBorder ? '$surface1' : '$transparent'}
+      borderColor={showBorder ? borderColor : '$transparent'}
       borderRadius="$roundedFull"
-      borderWidth={showBorder ? 2 : 0}
-      position="relative">
+      borderWidth={showBorder ? borderWidth : 0}
+      position="relative"
+      testID="account-icon">
       {avatarUri ? (
         <RemoteImage
           borderRadius={size}
           fallback={uniconImage}
           height={size}
+          resizeMode="cover"
           uri={avatarUri}
           width={size}
         />
@@ -73,7 +88,8 @@ export function AccountIcon({
           bottom={-4}
           justifyContent="center"
           position="absolute"
-          right={-4}>
+          right={-4}
+          testID="account-icon/view-only-badge">
           <Icons.Eye color="$neutral2" size={eyeIconSize} />
         </Flex>
       )}
@@ -82,7 +98,7 @@ export function AccountIcon({
 }
 
 // Circle shaped gradient that follows Unicon colors.
-const UniconGradient = ({ color, size }: { color: string; size: number }): JSX.Element => {
+export const UniconGradient = ({ color, size }: { color: string; size: number }): JSX.Element => {
   return (
     <Svg height={size} style={UniconGradientStyles.svg} width={size}>
       <Defs>

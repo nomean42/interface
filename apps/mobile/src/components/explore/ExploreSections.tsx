@@ -16,17 +16,16 @@ import {
   getTokensOrderByValues,
 } from 'src/features/explore/utils'
 import { usePollOnFocusOnly } from 'src/utils/hooks'
-import { Flex, Text, useDeviceInsets } from 'ui/src'
-import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
-import { TokenLoader } from 'wallet/src/components/loading/TokenLoader'
-import { getWrappedNativeAddress } from 'wallet/src/constants/addresses'
-import { ChainId } from 'wallet/src/constants/chains'
-import { PollingInterval } from 'wallet/src/constants/misc'
+import { Flex, Loader, Text, useDeviceInsets } from 'ui/src'
 import {
   Chain,
   ExploreTokensTabQuery,
   useExploreTokensTabQuery,
-} from 'wallet/src/data/__generated__/types-and-hooks'
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
+import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
+import { getWrappedNativeAddress } from 'wallet/src/constants/addresses'
+import { ChainId } from 'wallet/src/constants/chains'
+import { PollingInterval } from 'wallet/src/constants/misc'
 import { fromGraphQLChain } from 'wallet/src/features/chains/utils'
 import { usePersistedError } from 'wallet/src/features/dataApi/utils'
 import {
@@ -143,8 +142,8 @@ export function ExploreSections({ listRef }: ExploreSectionsProps): JSX.Element 
     return (
       <Flex height="100%" pb="$spacing60">
         <BaseCard.ErrorState
-          retryButtonLabel={t('Retry')}
-          title={t('Couldn’t load tokens')}
+          retryButtonLabel={t('common.button.retry')}
+          title={t('explore.tokens.error')}
           onRetry={onRetry}
         />
       </Flex>
@@ -167,7 +166,7 @@ export function ExploreSections({ listRef }: ExploreSectionsProps): JSX.Element 
         ref={listRef}
         ListEmptyComponent={
           <Flex mx="$spacing24" my="$spacing12">
-            <TokenLoader repeat={5} />
+            <Loader.Token repeat={5} />
           </Flex>
         }
         ListHeaderComponent={
@@ -189,7 +188,7 @@ export function ExploreSections({ listRef }: ExploreSectionsProps): JSX.Element 
               mt="$spacing16"
               pl="$spacing4">
               <Text color="$neutral2" flexShrink={0} paddingEnd="$spacing8" variant="subheading2">
-                {t('Top tokens')}
+                {t('explore.tokens.top.title')}
               </Text>
               <Flex flexShrink={1}>
                 <SortButton orderBy={orderBy} />
@@ -258,14 +257,14 @@ function FavoritesSection(props: FavoritesSectionProps): JSX.Element | null {
 
   return (
     <Flex
-      bg="$transparent"
+      backgroundColor="$transparent"
       gap="$spacing12"
       pb="$spacing12"
       pt="$spacing8"
       px="$spacing12"
       zIndex={1}>
       {hasFavoritedTokens && <FavoriteTokensGrid {...props} />}
-      {hasFavoritedWallets && <FavoriteWalletsGrid showLoading={props.showLoading} />}
+      {hasFavoritedWallets && <FavoriteWalletsGrid {...props} />}
     </Flex>
   )
 }

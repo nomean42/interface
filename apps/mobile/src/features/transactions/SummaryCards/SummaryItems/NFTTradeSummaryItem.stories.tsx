@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import React from 'react'
-import TransactionSummaryLayout from 'src/features/transactions/SummaryCards/TransactionSummaryLayout'
 import { ChainId } from 'wallet/src/constants/chains'
 import { NFTTradeSummaryItem } from 'wallet/src/features/transactions/SummaryCards/SummaryItems/NFTTradeSummaryItem'
+import TransactionSummaryLayout from 'wallet/src/features/transactions/SummaryCards/SummaryItems/TransactionSummaryLayout'
 import {
   NFTTradeTransactionInfo,
   NFTTradeType,
@@ -69,7 +69,7 @@ export const NFTBuy: StoryObj = {
         layoutElement={TransactionSummaryLayout}
         transaction={{
           ...baseNFTBuyTx,
-          status: TransactionStatus.Cancelled,
+          status: TransactionStatus.Canceled,
         }}
       />
       <NFTTradeSummaryItem
@@ -111,7 +111,7 @@ export const NFTSell: StoryObj = {
         layoutElement={TransactionSummaryLayout}
         transaction={{
           ...baseNFTSellTx,
-          status: TransactionStatus.Cancelled,
+          status: TransactionStatus.Canceled,
         }}
       />
       <NFTTradeSummaryItem

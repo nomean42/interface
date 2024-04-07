@@ -1,10 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import React from 'react'
-import TransactionSummaryLayout from 'src/features/transactions/SummaryCards/TransactionSummaryLayout'
+import {
+  Chain,
+  TokenDocument,
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import { getNativeAddress } from 'wallet/src/constants/addresses'
 import { ChainId } from 'wallet/src/constants/chains'
-import { Chain, TokenDocument } from 'wallet/src/data/__generated__/types-and-hooks'
 import { FiatPurchaseSummaryItem } from 'wallet/src/features/transactions/SummaryCards/SummaryItems/FiatPurchaseSummaryItem'
+import TransactionSummaryLayout from 'wallet/src/features/transactions/SummaryCards/SummaryItems/TransactionSummaryLayout'
 import {
   FiatPurchaseTransactionInfo,
   TransactionDetails,
@@ -102,7 +105,7 @@ export const FiatPurchase: StoryObj = {
         layoutElement={TransactionSummaryLayout}
         transaction={{
           ...baseFaitPurchaseTx,
-          status: TransactionStatus.Cancelled,
+          status: TransactionStatus.Canceled,
         }}
       />
       <FiatPurchaseSummaryItem

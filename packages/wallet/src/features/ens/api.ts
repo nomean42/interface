@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { providers } from 'ethers'
 import { useMemo } from 'react'
+import { useRestQuery } from 'uniswap/src/data/rest'
 import { ONE_MINUTE_MS } from 'utilities/src/time/time'
 import { ChainId } from 'wallet/src/constants/chains'
-import { useRestQuery } from 'wallet/src/data/rest'
 import { createEthersProvider } from 'wallet/src/features/providers/createEthersProvider'
 import { areAddressesEqual } from 'wallet/src/utils/addresses'
 
@@ -15,6 +15,8 @@ export enum EnsLookupType {
   Name = 'name',
   Address = 'address',
   Avatar = 'avatar',
+  Description = 'description',
+  TwitterUsername = 'com.twitter',
 }
 
 export type EnsLookupParams = {
@@ -46,6 +48,12 @@ async function getAvatarFetch(address: string, provider: providers.JsonRpcProvid
   return checkedName ? await provider.getAvatar(checkedName) : null
 }
 
+async function getTextFetch(key: string, name: string, provider: providers.JsonRpcProvider) {
+  const resolver = await provider.getResolver(name)
+  const text = resolver?.getText(key)
+  return text ?? null
+}
+
 export const getOnChainEnsFetch = async (params: EnsLookupParams): Promise<Response> => {
   const { type, nameOrAddress } = params
   const provider = createEthersProvider(ChainId.Mainnet)
@@ -65,6 +73,12 @@ export const getOnChainEnsFetch = async (params: EnsLookupParams): Promise<Respo
     case EnsLookupType.Avatar:
       response = await getAvatarFetch(nameOrAddress, provider)
       break
+    case EnsLookupType.Description:
+      response = await getTextFetch('description', nameOrAddress, provider)
+      break
+    case EnsLookupType.TwitterUsername:
+      response = await getTextFetch('com.twitter', nameOrAddress, provider)
+      break
     default:
       throw new Error(`Invalid ENS lookup type: ${type}`)
   }
@@ -77,7 +91,7 @@ function useEnsQuery(
   nameOrAddress?: string | null,
   chainId: ChainId = ChainId.Mainnet
 ) {
-  const result = useRestQuery<{ data?: string; timestamp: number }, EnsLookupParams>(
+  const result = useRestQuery<{ data: Maybe<string>; timestamp: number }, EnsLookupParams>(
     STUB_ONCHAIN_ENS_ENDPOINT, // will invoke `getOnChainEnsFetch`
     // the query is skipped if this is not defined so the assertion is okay
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -106,4 +120,10 @@ export function useAddressFromEns(maybeName: string | null, chainId: ChainId = C
 }
 export function useENSAvatar(address?: string | null, chainId: ChainId = ChainId.Mainnet) {
   return useEnsQuery(EnsLookupType.Avatar, address, chainId)
+}
+export function useENSDescription(name?: string | null, chainId: ChainId = ChainId.Mainnet) {
+  return useEnsQuery(EnsLookupType.Description, name, chainId)
+}
+export function useENSTwitterUsername(name?: string | null, chainId: ChainId = ChainId.Mainnet) {
+  return useEnsQuery(EnsLookupType.TwitterUsername, name, chainId)
 }

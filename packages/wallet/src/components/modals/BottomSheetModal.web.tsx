@@ -1,13 +1,10 @@
 import { pick } from 'lodash'
-import { ComponentProps, forwardRef } from 'react'
-import { Flex, Sheet } from 'ui/src'
+import { ComponentProps, useEffect, useState } from 'react'
+import { Flex, Sheet, useSporeColors } from 'ui/src'
 import { Trace } from 'utilities/src/telemetry/trace/Trace'
 import { TextInput } from 'wallet/src/components/input/TextInput'
 import { BottomSheetContextProvider } from 'wallet/src/components/modals/BottomSheetContext'
-import {
-  BottomSheetModalProps,
-  BottomSheetModalRef,
-} from 'wallet/src/components/modals/BottomSheetModalProps'
+import { BottomSheetModalProps } from 'wallet/src/components/modals/BottomSheetModalProps'
 
 export type WebBottomSheetProps = Pick<
   BottomSheetModalProps,
@@ -16,25 +13,25 @@ export type WebBottomSheetProps = Pick<
   | 'onClose'
   | 'fullScreen'
   | 'backgroundColor'
-  | 'isModalOpen'
   | 'isDismissible'
+  | 'isModalOpen'
+  | 'alignment'
 >
 
-export const BottomSheetModal = forwardRef<BottomSheetModalRef, BottomSheetModalProps>(
-  function _BottomSheetModal(props: BottomSheetModalProps): JSX.Element {
-    const supportedProps = pick(props, [
-      'name',
-      'onClose',
-      'fullScreen',
-      'backgroundColor',
-      'isModalOpen',
-      'children',
-      'isDismissible',
-    ])
+export function BottomSheetModal(props: BottomSheetModalProps): JSX.Element {
+  const supportedProps = pick(props, [
+    'name',
+    'onClose',
+    'fullScreen',
+    'backgroundColor',
+    'children',
+    'isDismissible',
+    'isModalOpen',
+    'alignment',
+  ])
 
-    return <WebBottomSheetModal {...supportedProps} />
-  }
-)
+  return <WebBottomSheetModal {...supportedProps} />
+}
 
 // No detached mode necessary yet in web
 export function BottomSheetDetachedModal(props: BottomSheetModalProps): JSX.Element {
@@ -46,39 +43,67 @@ export function BottomSheetDetachedModal(props: BottomSheetModalProps): JSX.Elem
     'isModalOpen',
     'children',
     'isDismissible',
+    'alignment',
   ])
 
   return <WebBottomSheetModal {...supportedProps} />
 }
 
+const ANIMATION_MS = 200
+
 function WebBottomSheetModal({
   children,
   name,
-  isModalOpen = true,
   onClose,
   fullScreen,
   backgroundColor,
   isDismissible = true,
+  isModalOpen = true,
+  alignment = 'center',
 }: WebBottomSheetProps): JSX.Element {
+  const colors = useSporeColors()
+  const [fullyClosed, setFullyClosed] = useState(false)
+
+  if (fullyClosed && isModalOpen) {
+    setFullyClosed(false)
+  }
+
+  // Not the greatest, we are syncing 200 here to 200ms animation
+  // TODO(EXT-745): Add Tamagui onFullyClosed callback and replace here
+  useEffect(() => {
+    if (!isModalOpen) {
+      const tm = setTimeout(() => {
+        setFullyClosed(true)
+      }, ANIMATION_MS)
+
+      return () => {
+        clearTimeout(tm)
+      }
+    }
+  }, [isModalOpen])
+
+  const isBottomAligned = alignment === 'bottom'
+
   return (
     <Trace logImpression={isModalOpen} modal={name}>
       <BottomSheetContextProvider isSheetReady={true}>
         <Sheet
           disableDrag
           modal
-          animation="200ms"
+          animation={`${ANIMATION_MS}ms`}
           dismissOnOverlayPress={false}
           dismissOnSnapToBottom={false}
           open={isModalOpen}
+          snapPoints={fullScreen || !isBottomAligned ? [100] : undefined}
           onOpenChange={(open: boolean): void => {
             !open && onClose?.()
           }}>
           <Sheet.Overlay
-            animation="lazy"
-            backgroundColor="$transparent"
+            backgroundColor="$black"
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
             height="100%"
-            // eslint-disable-next-line react-native/no-inline-styles
-            style={{ backdropFilter: 'blur(6px)' }}
+            opacity={0.6}
             onPress={(): void => {
               isDismissible && onClose?.()
             }}
@@ -86,18 +111,18 @@ function WebBottomSheetModal({
           <Sheet.Frame
             backgroundColor="$transparent"
             flex={1}
-            justifyContent="flex-end"
-            padding="$spacing12">
+            height={fullScreen || !isBottomAligned ? '100%' : undefined}
+            justifyContent={
+              alignment === 'center' ? 'center' : alignment === 'top' ? 'flex-start' : 'flex-end'
+            }
+            p="$spacing12">
             <Flex
               borderRadius="$rounded24"
-              height={fullScreen ? '100%' : undefined}
               p="$spacing12"
-              shadowColor="$neutral3"
-              shadowOpacity={0.04}
-              shadowRadius="$spacing12"
-              style={{ backgroundColor }}
+              style={{ backgroundColor: backgroundColor ?? colors.surface1.val }}
               width="100%">
-              {children}
+              {/* To keep this consistent with how the `BottomSheetModal` works on native mobile, we only mount the children when the modal is open. */}
+              {fullyClosed ? null : children}
             </Flex>
           </Sheet.Frame>
         </Sheet>

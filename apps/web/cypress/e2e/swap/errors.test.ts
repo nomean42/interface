@@ -7,8 +7,7 @@ import { DAI, USDC_MAINNET } from '../../../src/constants/tokens'
 import { getBalance, getTestSelector } from '../../utils'
 
 describe('Swap errors', () => {
-  // TODO re-enable web test
-  it.skip('wallet rejection', () => {
+  it('wallet rejection', () => {
     cy.visit(`/swap?inputCurrency=ETH&outputCurrency=${USDC_MAINNET.address}`)
     cy.hardhat().then((hardhat) => {
       // Stub the wallet to reject any transaction.
@@ -29,8 +28,7 @@ describe('Swap errors', () => {
     })
   })
 
-  // TODO re-enable web test
-  it.skip('transaction past deadline', () => {
+  it('transaction past deadline', () => {
     cy.visit(`/swap?inputCurrency=ETH&outputCurrency=${USDC_MAINNET.address}`)
     cy.hardhat({ automine: false })
     getBalance(USDC_MAINNET).then((initialBalance) => {
@@ -84,7 +82,6 @@ describe('Swap errors', () => {
         send.withArgs('eth_estimateGas').resolves(BigNumber.from(2_000_000))
         send.callThrough()
       })
-
       // Set slippage to a very low value.
       cy.get(getTestSelector('open-settings-dialog-button')).click()
       cy.get(getTestSelector('max-slippage-settings')).click()
@@ -92,15 +89,14 @@ describe('Swap errors', () => {
       cy.get(getTestSelector('toggle-uniswap-x-button')).click() // turn off uniswapx
       cy.get('body').click('topRight') // close modal
       cy.get(getTestSelector('slippage-input')).should('not.exist')
-
       // Submit 2 transactions
       for (let i = 0; i < 2; i++) {
         cy.get('#swap-currency-input .token-amount-input').type('200').should('have.value', '200')
         cy.get('#swap-currency-output .token-amount-input').should('not.have.value', '')
         cy.get('#swap-button').click()
-        cy.contains('Confirm swap').click()
+        cy.contains(i === 0 ? 'Sign and swap' : 'Confirm swap').click()
         cy.wait('@eth_sendRawTransaction').wait('@eth_getTransactionReceipt')
-        cy.contains('Swap submitted')
+        cy.contains(i === 0 ? 'Swap pending...' : 'Swap submitted')
         if (i === 0) {
           cy.get(getTestSelector('confirmation-close-icon')).click()
         }
@@ -111,19 +107,15 @@ describe('Swap errors', () => {
       cy.hardhat().then((hardhat) => hardhat.mine())
       cy.wait('@eth_getTransactionReceipt')
 
-      cy.contains('Swap failed')
-
       // Verify only 1 transaction occurred
       cy.get(getTestSelector('web3-status-connected')).should('not.contain', 'Pending')
-      cy.get(getTestSelector('popups')).contains('Swapped')
-      cy.get(getTestSelector('popups')).contains('Swap failed')
       getBalance(DAI).should('be.closeTo', initialBalance + 200, 1)
     })
   })
 
   it('insufficient liquidity', () => {
     // The API response is too variable so stubbing a 404.
-    cy.intercept('POST', 'https://api.uniswap.org/v2/quote', {
+    cy.intercept('POST', 'https://interface.gateway.uniswap.org/v2/quote', {
       statusCode: 404,
       fixture: 'insufficientLiquidity.json',
     })

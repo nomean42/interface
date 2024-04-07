@@ -1,45 +1,51 @@
-import React, { useCallback, useState } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getUniqueId } from 'react-native-device-info'
+import { ActivityIndicator } from 'react-native'
 import { navigate } from 'src/app/navigation/rootNavigation'
-import { UnitagStackScreenProp } from 'src/app/navigation/types'
+import { UnitagEntryPoint, UnitagStackScreenProp } from 'src/app/navigation/types'
+import { useAvatarSelectionHandler } from 'src/components/unitags/AvatarSelection'
 import { ChoosePhotoOptionsModal } from 'src/components/unitags/ChoosePhotoOptionsModal'
 import { UnitagProfilePicture } from 'src/components/unitags/UnitagProfilePicture'
 import { SafeKeyboardOnboardingScreen } from 'src/features/onboarding/SafeKeyboardOnboardingScreen'
-import { isLocalFileUri, uploadAndUpdateAvatarAfterClaim } from 'src/features/unitags/avatars'
+import { UnitagName } from 'src/features/unitags/UnitagName'
 import { OnboardingScreens, Screens, UnitagScreens } from 'src/screens/Screens'
-import { AnimatedFlex, Button, Flex, Icons, Text } from 'ui/src'
-import Unitag from 'ui/src/assets/graphics/unitag.svg'
-import { iconSizes, imageSizes, spacing } from 'ui/src/theme'
-import { logger } from 'utilities/src/logger/logger'
-import { useAsyncData } from 'utilities/src/react/hooks'
-import { pushNotification } from 'wallet/src/features/notifications/slice'
-import { AppNotificationType } from 'wallet/src/features/notifications/types'
+import { Button, Flex, Icons, Text, useIsDarkMode, useSporeColors } from 'ui/src'
+import { fonts, iconSizes, imageSizes, spacing } from 'ui/src/theme'
+import { UnitagClaimSource } from 'uniswap/src/features/unitags/types'
+import { ChainId } from 'wallet/src/constants/chains'
+import { useENSName } from 'wallet/src/features/ens/api'
 import { ImportType, OnboardingEntryPoint } from 'wallet/src/features/onboarding/types'
-import {
-  useClaimUnitagMutation,
-  useUnitagUpdateMetadataMutation,
-} from 'wallet/src/features/unitags/api'
-import { parseUnitagErrorCode } from 'wallet/src/features/unitags/utils'
-import { useActiveAccountAddress, usePendingAccounts } from 'wallet/src/features/wallet/hooks'
-import { useAppDispatch } from 'wallet/src/state'
+import { useClaimUnitag } from 'wallet/src/features/unitags/hooks'
+import { ElementName } from 'wallet/src/telemetry/constants'
+
+function convertEntryPointToAnalyticsSource(entryPoint: UnitagEntryPoint): UnitagClaimSource {
+  switch (entryPoint) {
+    case Screens.Home:
+      return 'home'
+    case Screens.Settings:
+      return 'settings'
+    case OnboardingScreens.Landing:
+      return 'onboarding'
+    default:
+      throw new Error(`unhandled entryPoint for ChooseProfilePictureScreen: ${entryPoint}`)
+  }
+}
 
 export function ChooseProfilePictureScreen({
   route,
 }: UnitagStackScreenProp<UnitagScreens.ChooseProfilePicture>): JSX.Element {
-  const { entryPoint, unitag } = route.params
-  const activeAddress = useActiveAccountAddress()
-  const pendingAccountAddress = Object.values(usePendingAccounts())?.[0]?.address
-  const unitagAddress = activeAddress || pendingAccountAddress
+  const { entryPoint, unitag, unitagFontSize, address } = route.params
 
   const { t } = useTranslation()
-  const dispatch = useAppDispatch()
+  const colors = useSporeColors()
+  const { data: ensName } = useENSName(address, ChainId.Mainnet)
+  const claimUnitag = useClaimUnitag()
+  const isDarkMode = useIsDarkMode()
+
   const [imageUri, setImageUri] = useState<string>()
   const [showModal, setShowModal] = useState(false)
   const [claimError, setClaimError] = useState<string>()
-  const [claimUnitag] = useClaimUnitagMutation()
-  const [updateUnitagMetadata] = useUnitagUpdateMetadataMutation(unitag)
-  const { data: deviceId } = useAsyncData(getUniqueId)
+  const [isClaiming, setIsClaiming] = useState(false)
 
   const openModal = (): void => {
     setShowModal(true)
@@ -49,125 +55,89 @@ export function ChooseProfilePictureScreen({
     setShowModal(false)
   }
 
+  const { avatarSelectionHandler, hasNFTs } = useAvatarSelectionHandler({
+    address,
+    avatarImageUri: imageUri,
+    setAvatarImageUri: setImageUri,
+    showModal: openModal,
+  })
+
   const onPressContinue = async (): Promise<void> => {
-    if (!deviceId) {
-      return // Should never hit this condition. Button is disabled if deviceId is undefined
-    }
-
-    // throw error if unitagAddress is falsey
-    if (!unitagAddress) {
-      const error = new Error('unitagAddress should never be null when claiming a unitag')
-      logger.error(error, {
-        tags: { file: 'ChooseProfilePictureScreen', function: 'onPressFinish' },
+    if (entryPoint === OnboardingScreens.Landing) {
+      // Handle case navigating from onboarding
+      navigate(Screens.OnboardingStack, {
+        screen: OnboardingScreens.WelcomeWallet,
+        params: {
+          importType: ImportType.CreateNew,
+          entryPoint: OnboardingEntryPoint.FreshInstallOrReplace,
+          unitagClaim: {
+            address,
+            username: unitag,
+            avatarUri: imageUri,
+          },
+        },
       })
-      return
-    }
-
-    const { data: claimResponse } = await claimUnitag({
-      address: unitagAddress,
-      username: unitag,
-      deviceId,
-      metadata: {
-        avatar: imageUri && isLocalFileUri(imageUri) ? undefined : imageUri,
-      },
-    })
-    if (claimResponse?.data.errorCode) {
-      setClaimError(parseUnitagErrorCode(t, unitag, claimResponse?.data.errorCode))
-      return
-    }
-
-    if (claimResponse?.data.success) {
-      await onClaimSuccess()
-      return
+    } else {
+      return attemptClaimUnitag()
     }
   }
 
-  const onClaimSuccess = useCallback(async (): Promise<void> => {
-    if (imageUri && isLocalFileUri(imageUri) && !!unitagAddress) {
-      // unitagAddress should always be defined here otherwise onPressContinue would've thrown an error
-      const { success: updateSuccess } = await uploadAndUpdateAvatarAfterClaim(
-        unitag,
-        unitagAddress,
-        imageUri,
-        updateUnitagMetadata
-      )
-      if (!updateSuccess) {
-        dispatch(
-          pushNotification({
-            type: AppNotificationType.Error,
-            errorMessage: t('Could not set avatar. Try again later.'),
-          })
-        )
+  const attemptClaimUnitag = async (): Promise<void> => {
+    setIsClaiming(true)
+    const source = convertEntryPointToAnalyticsSource(entryPoint)
+    const { claimError: attemptClaimError } = await claimUnitag(
+      {
+        address,
+        username: unitag,
+        avatarUri: imageUri,
+      },
+      {
+        source,
+        hasENSAddress: !!ensName,
       }
-    }
+    )
+    setIsClaiming(false)
+    setClaimError(attemptClaimError)
 
-    if (entryPoint === Screens.Home) {
-      if (!unitagAddress) {
-        const error = new Error(
-          'unitagAddress should never be null when Unitag entryPoint is Home Screen'
-        )
-        logger.error(error, {
-          tags: { file: 'ChooseProfilePictureScreen', function: 'onClaimSuccess' },
-        })
-        return
-      }
+    // Navigate to confirmation screen when a claim has been made
+    if (attemptClaimError === undefined) {
       navigate(Screens.UnitagStack, {
         screen: UnitagScreens.UnitagConfirmation,
         params: {
           unitag,
-          address: unitagAddress,
+          address,
           profilePictureUri: imageUri,
         },
       })
-    } else {
-      // entryPoint === OnboardingScreens.Landing
-      navigate(Screens.OnboardingStack, {
-        screen: OnboardingScreens.QRAnimation,
-        params: {
-          importType: ImportType.CreateNew,
-          entryPoint: OnboardingEntryPoint.FreshInstallOrReplace,
-        },
-      })
     }
-  }, [dispatch, entryPoint, imageUri, t, unitag, unitagAddress, updateUnitagMetadata])
+  }
 
   return (
     <SafeKeyboardOnboardingScreen
-      subtitle={t(
-        'Upload your own or stick with your unique Unicon. You can always change this later.'
-      )}
-      title={t('Choose a profile photo')}>
-      <Flex centered gap="$spacing20">
-        <Flex onPress={openModal}>
+      subtitle={t('unitags.onboarding.profile.subtitle')}
+      title={t('unitags.onboarding.profile.title')}>
+      <Flex centered gap="$spacing20" mt="$spacing24">
+        <Flex mt="$spacing48" onPress={avatarSelectionHandler}>
           <Flex px="$spacing4">
-            <ProfilePicture address={unitagAddress} imageUri={imageUri} />
+            <ProfilePicture address={address} imageUri={imageUri} />
           </Flex>
           <Flex
-            bg="$surface1"
+            backgroundColor="$surface1"
             borderRadius="$roundedFull"
-            bottom={-spacing.spacing8}
-            p="$spacing8"
+            bottom={-spacing.spacing2}
+            p="$spacing4"
             position="absolute"
-            right={-spacing.spacing8}>
-            <Flex bg="$neutral2" borderRadius="$roundedFull" p="$spacing8">
-              <Icons.Edit color="$surface1" size={iconSizes.icon20} />
+            right={-spacing.spacing2}
+            testID={ElementName.Edit}>
+            <Flex
+              backgroundColor={isDarkMode ? '$neutral3' : '$neutral2'}
+              borderRadius="$roundedFull"
+              p={8}>
+              <Icons.Pen color={isDarkMode ? '$neutral1' : '$surface1'} size={iconSizes.icon16} />
             </Flex>
           </Flex>
         </Flex>
-        <AnimatedFlex
-          row
-          alignSelf="center"
-          animation="lazy"
-          // eslint-disable-next-line react-native/no-inline-styles
-          enterStyle={{ o: 0 }}
-          gap="$spacing20">
-          <Text color="$neutral1" variant="heading2">
-            {unitag}
-          </Text>
-          <Flex row position="absolute" right={-spacing.spacing8} top={-spacing.spacing8}>
-            <Unitag height={iconSizes.icon24} width={iconSizes.icon24} />
-          </Flex>
-        </AnimatedFlex>
+        <UnitagName fontSize={unitagFontSize} name={unitag} />
         {!!claimError && (
           <Text color="$statusCritical" variant="body2">
             {claimError}
@@ -175,15 +145,23 @@ export function ChooseProfilePictureScreen({
         )}
       </Flex>
       <Button
-        disabled={!deviceId || !!claimError}
+        disabled={!!claimError || isClaiming}
         size="medium"
+        testID={ElementName.Continue}
         theme="primary"
         onPress={onPressContinue}>
-        {t('Continue')}
+        {isClaiming ? (
+          <Flex height={fonts.buttonLabel1.lineHeight}>
+            <ActivityIndicator color={colors.sporeWhite.val} />
+          </Flex>
+        ) : (
+          t('common.button.continue')
+        )}
       </Button>
       {showModal && (
         <ChoosePhotoOptionsModal
-          address={activeAddress}
+          address={address}
+          hasNFTs={hasNFTs}
           setPhotoUri={setImageUri}
           showRemoveOption={!!imageUri}
           onClose={onCloseModal}
@@ -204,8 +182,8 @@ function ProfilePicture({
     return (
       <UnitagProfilePicture
         address={address}
-        profilePictureUri={imageUri}
         size={imageSizes.image100}
+        unitagAvatarUri={imageUri}
       />
     )
   }

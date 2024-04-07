@@ -1,19 +1,15 @@
 /* eslint-disable max-lines */
+import { useApolloClient } from '@apollo/client'
 import { useIsFocused, useScrollToTop } from '@react-navigation/native'
 import { FlashList } from '@shopify/flash-list'
-import { impactAsync } from 'expo-haptics'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Freeze } from 'react-freeze'
 import { useTranslation } from 'react-i18next'
 import { FlatList, StyleProp, View, ViewProps, ViewStyle } from 'react-native'
-import { TapGestureHandler, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler'
 import Animated, {
-  cancelAnimation,
   FadeIn,
   FadeOut,
   interpolateColor,
-  runOnJS,
-  useAnimatedGestureHandler,
   useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -23,31 +19,31 @@ import Animated, {
 import { SvgProps } from 'react-native-svg'
 import { SceneRendererProps, TabBar } from 'react-native-tab-view'
 import { useAppDispatch, useAppSelector } from 'src/app/hooks'
+import { ExtensionPromoModal } from 'src/app/modals/ExtensionPromoModal'
+import { UniconsV2Modal } from 'src/app/modals/UniconsV2Modal'
 import { NavBar, SWAP_BUTTON_HEIGHT } from 'src/app/navigation/NavBar'
 import { AppStackScreenProp } from 'src/app/navigation/types'
+import { ScannerModalState } from 'src/components/QRCodeScanner/constants'
+import Trace from 'src/components/Trace/Trace'
+import TraceTabView from 'src/components/Trace/TraceTabView'
 import { AccountHeader } from 'src/components/accounts/AccountHeader'
-import { pulseAnimation } from 'src/components/buttons/utils'
-import { ActivityTab, ACTIVITY_TAB_DATA_DEPENDENCIES } from 'src/components/home/ActivityTab'
-import { FeedTab, FEED_TAB_DATA_DEPENDENCIES } from 'src/components/home/FeedTab'
-import { NftsTab, NFTS_TAB_DATA_DEPENDENCIES } from 'src/components/home/NftsTab'
-import { TokensTab, TOKENS_TAB_DATA_DEPENDENCIES } from 'src/components/home/TokensTab'
+import { ExtensionPromoBanner } from 'src/components/banners/ExtensionPromoBanner'
+import { ACTIVITY_TAB_DATA_DEPENDENCIES, ActivityTab } from 'src/components/home/ActivityTab'
+import { FEED_TAB_DATA_DEPENDENCIES, FeedTab } from 'src/components/home/FeedTab'
+import { NFTS_TAB_DATA_DEPENDENCIES, NftsTab } from 'src/components/home/NftsTab'
+import { TOKENS_TAB_DATA_DEPENDENCIES, TokensTab } from 'src/components/home/TokensTab'
 import { Screen } from 'src/components/layout/Screen'
 import {
   HeaderConfig,
-  renderTabLabel,
   ScrollPair,
-  TabContentProps,
   TAB_BAR_HEIGHT,
   TAB_STYLES,
   TAB_VIEW_SCROLL_THROTTLE,
+  TabContentProps,
+  renderTabLabel,
   useScrollSync,
 } from 'src/components/layout/TabHelpers'
-import { ScannerModalState } from 'src/components/QRCodeScanner/constants'
-import { TokenBalanceListRow } from 'src/components/TokenBalanceList/TokenBalanceListContext'
-import Trace from 'src/components/Trace/Trace'
-import TraceTabView from 'src/components/Trace/TraceTabView'
 import { UnitagBanner } from 'src/components/unitags/UnitagBanner'
-import { apolloClient } from 'src/data/usePersistedApolloClient'
 import { PortfolioBalance } from 'src/features/balances/PortfolioBalance'
 import { openModal } from 'src/features/modals/modalSlice'
 import { selectSomeModalOpen } from 'src/features/modals/selectSomeModalOpen'
@@ -60,6 +56,7 @@ import { hideSplashScreen } from 'src/utils/splashScreen'
 import {
   AnimatedFlex,
   Flex,
+  HapticFeedback,
   Text,
   TouchableArea,
   useDeviceDimensions,
@@ -72,15 +69,32 @@ import BuyIcon from 'ui/src/assets/icons/buy.svg'
 import ScanIcon from 'ui/src/assets/icons/scan-home.svg'
 import SendIcon from 'ui/src/assets/icons/send-action.svg'
 import { iconSizes, spacing } from 'ui/src/theme'
+import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
+import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
 import { ONE_SECOND_MS } from 'utilities/src/time/time'
 import { useInterval, useTimeout } from 'utilities/src/time/timing'
-import { FEATURE_FLAGS } from 'wallet/src/features/experiments/constants'
-import { useFeatureFlag } from 'wallet/src/features/experiments/hooks'
+import {
+  selectHasSkippedUnitagPrompt,
+  selectHasViewedUniconV2IntroModal,
+} from 'wallet/src/features/behaviorHistory/selectors'
 import { useSelectAddressHasNotifications } from 'wallet/src/features/notifications/hooks'
 import { setNotificationStatus } from 'wallet/src/features/notifications/slice'
-import { useCanActiveAddressClaimUnitag } from 'wallet/src/features/unitags/hooks'
+import { TokenBalanceListRow } from 'wallet/src/features/portfolio/TokenBalanceListContext'
+import {
+  useCanActiveAddressClaimUnitag,
+  useShowExtensionPromoBanner,
+} from 'wallet/src/features/unitags/hooks'
 import { AccountType } from 'wallet/src/features/wallet/accounts/types'
-import { useActiveAccountWithThrow } from 'wallet/src/features/wallet/hooks'
+import {
+  PendingAccountActions,
+  pendingAccountActions,
+} from 'wallet/src/features/wallet/create/pendingAccountsSaga'
+import {
+  useActiveAccountWithThrow,
+  useAvatar,
+  useNonPendingSignerAccounts,
+} from 'wallet/src/features/wallet/hooks'
+import { selectFinishedOnboarding } from 'wallet/src/features/wallet/selectors'
 import {
   ElementName,
   ElementNameType,
@@ -108,8 +122,23 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
   const isFocused = useIsFocused()
   const isModalOpen = useAppSelector(selectSomeModalOpen)
   const isHomeScreenBlur = !isFocused || isModalOpen
+  const { avatar, loading: avatarLoading } = useAvatar(activeAccount.address)
+  const hasAvatar = !!avatar && !avatarLoading
 
-  const showFeedTab = useFeatureFlag(FEATURE_FLAGS.FeedTab)
+  // Ensure if a user is here and has completed onboarding, they have at least one non-pending signer account
+  const finishedOnboarding = useAppSelector(selectFinishedOnboarding)
+  const nonPendingSignerAccounts = useNonPendingSignerAccounts()
+  useEffect(() => {
+    if (finishedOnboarding && activeAccount.pending && nonPendingSignerAccounts.length === 0) {
+      dispatch(pendingAccountActions.trigger(PendingAccountActions.ActivateOneAndDelete))
+    }
+  }, [activeAccount, dispatch, finishedOnboarding, nonPendingSignerAccounts.length])
+
+  const hasSkippedUnitagPrompt = useAppSelector(selectHasSkippedUnitagPrompt)
+
+  const hasViewedUniconV2IntroModal = useAppSelector(selectHasViewedUniconV2IntroModal)
+
+  const showFeedTab = useFeatureFlag(FeatureFlags.FeedTab)
   // opens the wallet restore modal if recovery phrase is missing after the app is opened
   useWalletRestore({ openModalImmediately: true })
 
@@ -125,10 +154,10 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
 
   const [tabIndex, setTabIndex] = useState(props?.route?.params?.tab ?? HomeScreenTabIndex.Tokens)
   // Necessary to declare these as direct dependencies due to race condition with initializing react-i18next and useMemo
-  const tokensTitle = t('Tokens')
-  const nftsTitle = t('NFTs')
-  const activityTitle = t('Activity')
-  const feedTitle = t('Feed')
+  const tokensTitle = t('home.tokens.title')
+  const nftsTitle = t('home.nfts.title')
+  const activityTitle = t('home.activity.title')
+  const feedTitle = t('home.feed.title')
 
   const routes = useMemo(() => {
     const tabs: Array<{ key: SectionNameType; title: string }> = [
@@ -207,7 +236,13 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
       return activityTabScrollValue.value
     }
     return feedTabScrollValue.value
-  }, [tabIndex])
+  }, [
+    activityTabScrollValue,
+    feedTabScrollValue,
+    nftsTabScrollValue,
+    tabIndex,
+    tokensTabScrollValue,
+  ])
 
   // clear the notification indicator if the user is on the activity tab
   const hasNotifications = useSelectAddressHasNotifications(activeAccount.address)
@@ -295,7 +330,8 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
 
   const { sync } = useScrollSync(currentTabIndex, scrollPairs, headerConfig)
 
-  const forAggregatorEnabled = useFeatureFlag(FEATURE_FLAGS.ForAggregator)
+  const forAggregatorEnabled = useFeatureFlag(FeatureFlags.ForAggregator)
+  const cexTransferEnabled = useFeatureFlag(FeatureFlags.CexTransfers)
 
   const onPressBuy = useCallback(
     () =>
@@ -314,13 +350,15 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
     )
   }, [dispatch])
   const onPressSend = useCallback(() => dispatch(openModal({ name: ModalName.Send })), [dispatch])
-  const onPressReceive = useCallback(
-    () =>
+  const onPressReceive = useCallback(() => {
+    if (cexTransferEnabled) {
+      dispatch(openModal({ name: ModalName.ReceiveCryptoModal }))
+    } else {
       dispatch(
         openModal({ name: ModalName.WalletConnectScan, initialState: ScannerModalState.WalletQr })
-      ),
-    [dispatch]
-  )
+      )
+    }
+  }, [dispatch, cexTransferEnabled])
   const onPressViewOnlyLabel = useCallback(
     () => dispatch(openModal({ name: ModalName.ViewOnlyExplainer })),
     [dispatch]
@@ -329,10 +367,10 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
   // Hide actions when active account isn't a signer account.
   const isSignerAccount = activeAccount.type === AccountType.SignerMnemonic
   // Necessary to declare these as direct dependencies due to race condition with initializing react-i18next and useMemo
-  const buyLabel = t('Buy')
-  const sendLabel = t('Send')
-  const receiveLabel = t('Receive')
-  const scanLabel = t('Scan')
+  const buyLabel = t('home.label.buy')
+  const sendLabel = t('home.label.send')
+  const receiveLabel = t('home.label.receive')
+  const scanLabel = t('home.label.scan')
 
   const actions = useMemo(
     (): QuickAction[] => [
@@ -380,40 +418,73 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
     ]
   )
 
-  const hasClaimEligibility = useCanActiveAddressClaimUnitag()
-  const viewOnlyLabel = t('This is a view-only wallet')
+  const { canClaimUnitag } = useCanActiveAddressClaimUnitag()
+
+  const shouldPromptUnitag =
+    activeAccount.type === AccountType.SignerMnemonic && !hasSkippedUnitagPrompt && canClaimUnitag
+
+  const isUniconsV2Enabled = useFeatureFlag(FeatureFlags.UniconsV2)
+  const shouldShowUniconV2Modal =
+    isUniconsV2Enabled && !hasViewedUniconV2IntroModal && !hasAvatar && !avatarLoading
+
+  const { showExtensionPromoBanner } = useShowExtensionPromoBanner()
+  const [showExtensionPromoModal, setShowExtensionPromoModal] = useState(false)
+
+  const viewOnlyLabel = t('home.warning.viewOnly')
+
+  const promoBanner = useMemo(() => {
+    if (shouldPromptUnitag) {
+      return (
+        <AnimatedFlex entering={FadeIn} exiting={FadeOut}>
+          <UnitagBanner address={activeAccount.address} entryPoint={Screens.Home} />
+        </AnimatedFlex>
+      )
+    } else if (showExtensionPromoBanner) {
+      return (
+        <AnimatedFlex entering={FadeIn} exiting={FadeOut}>
+          <ExtensionPromoBanner
+            onShowExtensionPromoModal={() => setShowExtensionPromoModal(true)}
+          />
+        </AnimatedFlex>
+      )
+    }
+    return null
+  }, [shouldPromptUnitag, showExtensionPromoBanner, activeAccount.address])
+
   const contentHeader = useMemo(() => {
     return (
-      <Flex bg="$surface1" gap="$spacing8" pb="$spacing16" px="$spacing24">
+      <Flex backgroundColor="$surface1" gap="$spacing8" pb="$spacing16" px="$spacing12">
         <AccountHeader />
-        <Flex pb="$spacing8">
+        <Flex pb="$spacing8" px="$spacing12">
           <PortfolioBalance owner={activeAccount.address} />
         </Flex>
         {isSignerAccount ? (
           <QuickActions actions={actions} sentry-label="QuickActions" />
         ) : (
           <TouchableArea hapticFeedback mt="$spacing16" onPress={onPressViewOnlyLabel}>
-            <Flex centered row bg="$surface2" br="$rounded12" minHeight={40} p="$spacing8">
+            <Flex
+              centered
+              row
+              backgroundColor="$surface2"
+              borderRadius="$rounded12"
+              minHeight={40}
+              p="$spacing8">
               <Text allowFontScaling={false} color="$neutral2" variant="body2">
                 {viewOnlyLabel}
               </Text>
             </Flex>
           </TouchableArea>
         )}
-        {hasClaimEligibility && (
-          <AnimatedFlex entering={FadeIn} exiting={FadeOut}>
-            <UnitagBanner />
-          </AnimatedFlex>
-        )}
+        {promoBanner}
       </Flex>
     )
   }, [
     activeAccount.address,
     isSignerAccount,
-    viewOnlyLabel,
     actions,
-    hasClaimEligibility,
     onPressViewOnlyLabel,
+    viewOnlyLabel,
+    promoBanner,
   ])
 
   const contentContainerStyle = useMemo<StyleProp<ViewStyle>>(
@@ -475,6 +546,8 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
     ),
   }))
 
+  const apolloClient = useApolloClient()
+
   const renderTabBar = useCallback(
     (sceneProps: SceneRendererProps) => {
       const style = { width: 'auto' }
@@ -502,7 +575,7 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
                 ]}
                 tabStyle={style}
                 onTabPress={async (): Promise<void> => {
-                  await impactAsync()
+                  await HapticFeedback.impact()
                 }}
               />
             </Animated.View>
@@ -528,7 +601,7 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
   const onRefreshHomeData = useCallback(async () => {
     setRefreshing(true)
 
-    await apolloClient?.refetchQueries({
+    await apolloClient.refetchQueries({
       include: [
         ...TOKENS_TAB_DATA_DEPENDENCIES,
         ...NFTS_TAB_DATA_DEPENDENCIES,
@@ -540,7 +613,7 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
     // Artificially delay 0.5 second to show the refresh animation
     const timeout = setTimeout(() => setRefreshing(false), 500)
     return () => clearTimeout(timeout)
-  }, [showFeedTab])
+  }, [apolloClient, showFeedTab])
 
   const renderTab = useCallback(
     ({
@@ -661,6 +734,23 @@ export function HomeScreen(props?: AppStackScreenProp<Screens.Home>): JSX.Elemen
         width="100%"
         zIndex="$sticky"
       />
+      {shouldShowUniconV2Modal ? (
+        <>
+          <UniconsV2Modal address={activeAccount?.address} />
+          {/* manual scrim so we can highlight unicon above it */}
+          <Flex
+            backgroundColor="$sporeBlack"
+            inset={0}
+            opacity={0.4}
+            position="absolute"
+            zIndex="$modalBackdrop"
+          />
+        </>
+      ) : (
+        showExtensionPromoModal && (
+          <ExtensionPromoModal onClose={() => setShowExtensionPromoModal(false)} />
+        )
+      )}
     </Screen>
   )
 }
@@ -677,7 +767,7 @@ type QuickAction = {
 
 function QuickActions({ actions }: { actions: QuickAction[] }): JSX.Element {
   return (
-    <Flex centered row gap="$spacing12">
+    <Flex centered row gap="$spacing12" px="$spacing12">
       {actions.map((action) => (
         <ActionButton
           key={action.name}
@@ -714,44 +804,25 @@ function ActionButton({
   iconScale?: number
 }): JSX.Element {
   const colors = useSporeColors()
-  const scale = useSharedValue(1)
-  const animatedStyle = useAnimatedStyle(
-    () => ({
-      transform: [{ scale: scale.value }],
-    }),
-    [scale]
-  )
   const media = useMedia()
   const iconSize = media.short ? iconSizes.icon24 : iconSizes.icon28
-  const onGestureEvent = useAnimatedGestureHandler<TapGestureHandlerGestureEvent>({
-    onStart: () => {
-      cancelAnimation(scale)
-      scale.value = pulseAnimation(activeScale)
-    },
-    onEnd: () => {
-      runOnJS(onPress)()
-    },
-  })
 
   return (
     <Trace logPress element={name} pressEvent={eventName}>
-      <TouchableArea hapticFeedback flex={flex} onPress={onPress}>
-        <TapGestureHandler onGestureEvent={onGestureEvent}>
-          <AnimatedFlex
-            centered
-            fill
-            backgroundColor="$DEP_backgroundActionButton"
-            borderRadius="$rounded20"
-            p="$spacing16"
-            style={animatedStyle}>
-            <Icon
-              color={colors.accent1.get()}
-              height={iconSize * iconScale}
-              strokeWidth={2}
-              width={iconSize * iconScale}
-            />
-          </AnimatedFlex>
-        </TapGestureHandler>
+      <TouchableArea hapticFeedback flex={flex} scaleTo={activeScale} onPress={onPress}>
+        <AnimatedFlex
+          centered
+          fill
+          backgroundColor="$DEP_backgroundActionButton"
+          borderRadius="$rounded20"
+          p="$spacing16">
+          <Icon
+            color={colors.accent1.get()}
+            height={iconSize * iconScale}
+            strokeWidth={2}
+            width={iconSize * iconScale}
+          />
+        </AnimatedFlex>
       </TouchableArea>
     </Trace>
   )

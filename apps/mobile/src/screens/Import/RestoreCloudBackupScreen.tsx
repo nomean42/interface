@@ -1,5 +1,4 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
-import dayjs from 'dayjs'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { ScrollView } from 'react-native-gesture-handler'
@@ -10,14 +9,20 @@ import { CloudStorageMnemonicBackup } from 'src/features/CloudBackup/types'
 import { OnboardingScreen } from 'src/features/onboarding/OnboardingScreen'
 import { OnboardingScreens } from 'src/screens/Screens'
 import { useAddBackButton } from 'src/utils/useAddBackButton'
-import { Flex, Icons, Text, TouchableArea, Unicon, useIsDarkMode } from 'ui/src'
+import { Flex, Icons, Text, TouchableArea, Unicon, UniconV2, useIsDarkMode } from 'ui/src'
 import { iconSizes } from 'ui/src/theme'
+import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
+import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
+import { getCloudProviderName } from 'uniswap/src/utils/cloud-backup/getCloudProviderName'
+import {
+  FORMAT_DATE_TIME_SHORT,
+  useLocalizedDayjs,
+} from 'wallet/src/features/language/localizedDayjs'
 import {
   PendingAccountActions,
   pendingAccountActions,
 } from 'wallet/src/features/wallet/create/pendingAccountsSaga'
 import { sanitizeAddressText, shortenAddress } from 'wallet/src/utils/addresses'
-import { isAndroid } from 'wallet/src/utils/platform'
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, OnboardingScreens.RestoreCloudBackup>
 
@@ -25,9 +30,12 @@ export function RestoreCloudBackupScreen({ navigation, route: { params } }: Prop
   const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const isDarkMode = useIsDarkMode()
+  const localizedDayjs = useLocalizedDayjs()
+
   // const backups = useMockCloudBackups(4) // returns 4 mock backups with random mnemonicIds and createdAt dates
   const backups = useCloudBackups()
   const sortedBackups = backups.slice().sort((a, b) => b.createdAt - a.createdAt)
+  const isUniconsV2Enabled = useFeatureFlag(FeatureFlags.UniconsV2)
 
   const onPressRestoreBackup = async (backup: CloudStorageMnemonicBackup): Promise<void> => {
     // Clear any existing pending accounts
@@ -44,12 +52,8 @@ export function RestoreCloudBackupScreen({ navigation, route: { params } }: Prop
 
   return (
     <OnboardingScreen
-      subtitle={
-        isAndroid
-          ? t('There are multiple recovery phrases backed up to your Google Drive.')
-          : t('There are multiple recovery phrases backed up to your iCloud.')
-      }
-      title={t('Select a backup to restore')}>
+      subtitle={t('account.cloud.backup.subtitle', { cloudProviderName: getCloudProviderName() })}
+      title={t('account.cloud.backup.title')}>
       <ScrollView>
         <Flex gap="$spacing8">
           {sortedBackups.map((backup) => {
@@ -67,13 +71,17 @@ export function RestoreCloudBackupScreen({ navigation, route: { params } }: Prop
                 onPress={(): Promise<void> => onPressRestoreBackup(backup)}>
                 <Flex row alignItems="center" justifyContent="space-between">
                   <Flex centered row gap="$spacing12">
-                    <Unicon address={mnemonicId} size={32} />
+                    {isUniconsV2Enabled ? (
+                      <UniconV2 address={mnemonicId} size={32} />
+                    ) : (
+                      <Unicon address={mnemonicId} size={32} />
+                    )}
                     <Flex>
                       <Text adjustsFontSizeToFit variant="subheading1">
                         {sanitizeAddressText(shortenAddress(mnemonicId))}
                       </Text>
                       <Text adjustsFontSizeToFit color="$neutral2" variant="buttonLabel4">
-                        {dayjs.unix(createdAt).format('MMM D, YYYY [at] h:mma')}
+                        {localizedDayjs.unix(createdAt).format(FORMAT_DATE_TIME_SHORT)}
                       </Text>
                     </Flex>
                   </Flex>

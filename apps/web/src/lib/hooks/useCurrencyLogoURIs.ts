@@ -1,16 +1,25 @@
 import { ChainId } from '@uniswap/sdk-core'
 import useHttpLocations from 'hooks/useHttpLocations'
 import { useMemo } from 'react'
-import { isAddress } from 'utils'
+import { isAddress } from 'utilities/src/addresses'
 
 import EthereumLogo from '../../assets/images/ethereum-logo.png'
 import AvaxLogo from '../../assets/svg/avax_logo.svg'
 import BnbLogo from '../../assets/svg/bnb-logo.svg'
 import CeloLogo from '../../assets/svg/celo_logo.svg'
 import MaticLogo from '../../assets/svg/matic-token-icon.svg'
-import { isCelo, NATIVE_CHAIN_ID, nativeOnChain } from '../../constants/tokens'
+import { NATIVE_CHAIN_ID, isCelo, nativeOnChain } from '../../constants/tokens'
 
-type Network = 'ethereum' | 'arbitrum' | 'optimism' | 'polygon' | 'smartchain' | 'celo' | 'avalanchec' | 'base'
+type Network =
+  | 'ethereum'
+  | 'arbitrum'
+  | 'optimism'
+  | 'polygon'
+  | 'smartchain'
+  | 'celo'
+  | 'avalanchec'
+  | 'base'
+  | 'blast'
 
 export function chainIdToNetworkName(networkId: ChainId): Network {
   switch (networkId) {
@@ -30,6 +39,8 @@ export function chainIdToNetworkName(networkId: ChainId): Network {
       return 'avalanchec'
     case ChainId.BASE:
       return 'base'
+    case ChainId.BLAST:
+      return 'blast'
     default:
       return 'ethereum'
   }

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { StyleSheet } from 'react-native'
 import { Flex, Text } from 'ui/src'
-import { isSVGUri, uriToHttp } from 'utilities/src/format/urls'
+import { isGifUri, isSVGUri, uriToHttp } from 'utilities/src/format/urls'
 import { NFTPreviewImage } from 'wallet/src/features/images/NFTPreviewImage'
 import { WebSvgUri } from 'wallet/src/features/images/WebSvgUri'
 import { ImageUri, ImageUriProps } from './ImageUri'
@@ -49,9 +49,14 @@ export function NFTViewer(props: Props): JSX.Element {
 
   const fallback = useMemo(
     () => (
-      <Flex centered aspectRatio={1} bg="$surface2" maxHeight={maxHeight ?? '100%'} width="100%">
+      <Flex
+        centered
+        aspectRatio={1}
+        backgroundColor="$surface2"
+        maxHeight={maxHeight ?? '100%'}
+        width="100%">
         <Text color="$neutral2" flex={0} variant="subheading2">
-          {placeholderContent || t('Content not available')}
+          {placeholderContent || t('tokens.nfts.error.unavailable')}
         </Text>
       </Flex>
     ),
@@ -70,7 +75,7 @@ export function NFTViewer(props: Props): JSX.Element {
    * TODO: Ideally we need to find a way to get compressed images without having to change
    * source in data response.
    */
-  const isGif = imageHttpUri.includes('.gif')
+  const isGif = isGifUri(imageHttpUri)
 
   const formattedUri =
     isGif && limitGIFSize

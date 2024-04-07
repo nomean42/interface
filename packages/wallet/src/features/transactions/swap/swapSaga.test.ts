@@ -10,8 +10,8 @@ import { DAI } from 'wallet/src/constants/tokens'
 import { NativeCurrency } from 'wallet/src/features/tokens/NativeCurrency'
 import { sendTransaction } from 'wallet/src/features/transactions/sendTransactionSaga'
 import { getBaseTradeAnalyticsProperties } from 'wallet/src/features/transactions/swap/analytics'
-import { approveAndSwap, SwapParams } from 'wallet/src/features/transactions/swap/swapSaga'
-import { Trade } from 'wallet/src/features/transactions/swap/useTrade'
+import { SwapParams, approveAndSwap } from 'wallet/src/features/transactions/swap/swapSaga'
+import { Trade } from 'wallet/src/features/transactions/swap/trade/types'
 import {
   ExactInputSwapTransactionInfo,
   TransactionType,
@@ -19,11 +19,16 @@ import {
 import { getProvider } from 'wallet/src/features/wallet/context'
 import { selectWalletSwapProtectionSetting } from 'wallet/src/features/wallet/selectors'
 import { SwapProtectionSetting } from 'wallet/src/features/wallet/slice'
-import { account, mockProvider } from 'wallet/src/test/fixtures'
+import { signerMnemonicAccount } from 'wallet/src/test/fixtures'
+import { getTxProvidersMocks } from 'wallet/src/test/mocks'
 import { currencyId } from 'wallet/src/utils/currencyId'
+
+const account = signerMnemonicAccount()
 
 const CHAIN_ID = ChainId.Goerli
 const universalRouterAddress = UNIVERSAL_ROUTER_ADDRESS(CHAIN_ID)
+
+const { mockProvider } = getTxProvidersMocks()
 
 const transactionTypeInfo: ExactInputSwapTransactionInfo = {
   type: TransactionType.Swap,

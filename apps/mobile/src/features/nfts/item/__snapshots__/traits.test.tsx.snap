@@ -4,7 +4,6 @@ exports[`renders trait card 1`] = `
 <View
   style={
     {
-      "alignItems": "stretch",
       "backgroundColor": "#2222220D",
       "borderBottomLeftRadius": 16,
       "borderBottomRightRadius": 16,
@@ -26,7 +25,7 @@ exports[`renders trait card 1`] = `
       {
         "color": "#7D7D7D",
         "fontFamily": "Basel-Medium",
-        "fontSize": 13,
+        "fontSize": 15,
         "fontWeight": "500",
         "lineHeight": 16,
       }

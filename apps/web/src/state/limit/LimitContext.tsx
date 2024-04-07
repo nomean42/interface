@@ -1,24 +1,7 @@
 import { createContext, Dispatch, PropsWithChildren, SetStateAction, useContext, useState } from 'react'
 
+import { Expiry, LimitState } from 'state/limit/types'
 import { LimitInfo, useDerivedLimitInfo } from './hooks'
-
-export enum Expiry {
-  Day = 1,
-  Week,
-  Month,
-  Year,
-}
-
-export interface LimitState {
-  readonly inputAmount: string
-  readonly outputAmount: string
-  readonly expiry: Expiry
-  readonly limitPrice: string
-
-  // The limit form has 3 fields, but only two of them can be independent at a time.
-  // Always prefer `marketPrice` be independent, so either derive the input amount or the output amount
-  readonly isInputAmountFixed: boolean
-}
 
 type LimitContextType = {
   limitState: LimitState
@@ -29,8 +12,10 @@ type LimitContextType = {
 const DEFAULT_LIMIT_STATE = {
   inputAmount: '',
   limitPrice: '',
+  limitPriceEdited: false,
+  limitPriceInverted: false,
   outputAmount: '',
-  expiry: Expiry.Day, // TODO: update default expiry?
+  expiry: Expiry.Week,
   isInputAmountFixed: true,
 }
 
@@ -51,7 +36,7 @@ export function useLimitContext() {
 export function LimitContextProvider({ children }: PropsWithChildren) {
   const [limitState, setLimitState] = useState<LimitState>(DEFAULT_LIMIT_STATE)
 
-  const derivedLimitInfo = useDerivedLimitInfo(limitState)
+  const derivedLimitInfo = useDerivedLimitInfo(limitState, setLimitState)
 
   return (
     <LimitContext.Provider value={{ limitState, setLimitState, derivedLimitInfo }}>{children}</LimitContext.Provider>
@@ -61,7 +46,7 @@ export function LimitContextProvider({ children }: PropsWithChildren) {
 export function useLimitPrice() {
   const { limitState, setLimitState } = useLimitContext()
   const setLimitPrice = (limitPrice: string) => {
-    setLimitState((prevState) => ({ ...prevState, limitPrice }))
+    setLimitState((prevState) => ({ ...prevState, limitPrice, limitPriceEdited: true }))
   }
-  return { limitPrice: limitState.limitPrice, setLimitPrice }
+  return { limitPrice: limitState.limitPrice, setLimitPrice, limitPriceInverted: limitState.limitPriceInverted }
 }

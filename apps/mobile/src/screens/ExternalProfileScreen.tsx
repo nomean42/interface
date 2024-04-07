@@ -8,7 +8,7 @@ import { ActivityTab } from 'src/components/home/ActivityTab'
 import { NftsTab } from 'src/components/home/NftsTab'
 import { TokensTab } from 'src/components/home/TokensTab'
 import { Screen } from 'src/components/layout/Screen'
-import { renderTabLabel, TabContentProps, TAB_STYLES } from 'src/components/layout/TabHelpers'
+import { renderTabLabel, TAB_STYLES, TabContentProps } from 'src/components/layout/TabHelpers'
 import Trace from 'src/components/Trace/Trace'
 import TraceTabView from 'src/components/Trace/TraceTabView'
 import { ProfileHeader } from 'src/features/externalProfile/ProfileHeader'
@@ -17,6 +17,7 @@ import { Screens } from 'src/screens/Screens'
 import { Flex, useDeviceInsets, useSporeColors } from 'ui/src'
 import { spacing } from 'ui/src/theme'
 import { useDisplayName } from 'wallet/src/features/wallet/hooks'
+import { DisplayNameType } from 'wallet/src/features/wallet/types'
 import { SectionName, SectionNameType } from 'wallet/src/telemetry/constants'
 
 type Props = NativeStackScreenProps<AppStackParamList, Screens.ExternalProfile> & {
@@ -38,9 +39,9 @@ export function ExternalProfileScreen({
 
   const tabs = useMemo(
     () => [
-      { key: SectionName.ProfileTokensTab, title: t('Tokens') },
-      { key: SectionName.ProfileNftsTab, title: t('NFTs') },
-      { key: SectionName.ProfileActivityTab, title: t('Activity') },
+      { key: SectionName.ProfileTokensTab, title: t('home.tokens.title') },
+      { key: SectionName.ProfileNftsTab, title: t('home.nfts.title') },
+      { key: SectionName.ProfileActivityTab, title: t('home.activity.title') },
     ],
     [t]
   )
@@ -141,8 +142,12 @@ export function ExternalProfileScreen({
   )
 
   const traceProperties = useMemo(
-    () => ({ address, walletName: displayName?.name }),
-    [address, displayName?.name]
+    () => ({
+      address,
+      walletName: displayName?.name,
+      displayNameType: displayName?.type ? DisplayNameType[displayName.type] : undefined,
+    }),
+    [address, displayName?.name, displayName?.type]
   )
 
   return (

@@ -1,12 +1,8 @@
-import { ChainId, Currency, Ether, NativeCurrency, Token, UNI_ADDRESSES, WETH9 } from '@uniswap/sdk-core'
+import { ChainId, Currency, NativeCurrency, Token, UNI_ADDRESSES, WETH9 } from '@uniswap/sdk-core'
 import invariant from 'tiny-invariant'
 
+// eslint-disable-next-line no-restricted-syntax
 export const NATIVE_CHAIN_ID = 'NATIVE'
-
-// When decimals are not specified for an ERC20 token
-// use default ERC20 token decimals as specified here:
-// https://docs.openzeppelin.com/contracts/3.x/erc20
-export const DEFAULT_ERC20_DECIMALS = 18
 
 export const USDC_MAINNET = new Token(
   ChainId.MAINNET,
@@ -15,8 +11,14 @@ export const USDC_MAINNET = new Token(
   'USDC',
   'USD//C'
 )
-const USDC_GOERLI = new Token(ChainId.GOERLI, '0x07865c6e87b9f70255377e024ace6630c1eaa37f', 6, 'USDC', 'USD//C')
-const USDC_SEPOLIA = new Token(ChainId.SEPOLIA, '0x6f14C02Fc1F78322cFd7d707aB90f18baD3B54f5', 6, 'USDC', 'USD//C')
+export const USDC_GOERLI = new Token(ChainId.GOERLI, '0x07865c6e87b9f70255377e024ace6630c1eaa37f', 6, 'USDC', 'USD//C')
+export const USDC_SEPOLIA = new Token(
+  ChainId.SEPOLIA,
+  '0x6f14C02Fc1F78322cFd7d707aB90f18baD3B54f5',
+  6,
+  'USDC',
+  'USD//C'
+)
 export const USDC_OPTIMISM = new Token(
   ChainId.OPTIMISM,
   '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
@@ -59,13 +61,7 @@ export const USDC_POLYGON_MUMBAI = new Token(
   'USDC',
   'USD Coin'
 )
-export const PORTAL_USDC_CELO = new Token(
-  ChainId.CELO,
-  '0x37f750B7cC259A2f741AF45294f6a16572CF5cAd',
-  6,
-  'USDCet',
-  'USDC (Portal from Ethereum)'
-)
+export const USDC_CELO = new Token(ChainId.CELO, '0xceba9300f2b948710d2653dd7b07f33a8b32118c', 6, 'USDC', 'USD Coin')
 export const USDC_BASE = new Token(ChainId.BASE, '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', 6, 'USDC', 'USD Coin')
 
 export const DAI = new Token(ChainId.MAINNET, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18, 'DAI', 'Dai Stablecoin')
@@ -222,6 +218,8 @@ export const BTC_BSC = new Token(ChainId.BNB, '0x7130d2A12B9BCbFAe4f2634d864A1Ee
 export const BUSD_BSC = new Token(ChainId.BNB, '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56', 18, 'BUSD', 'BUSD')
 export const DAI_BSC = new Token(ChainId.BNB, '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3', 18, 'DAI', 'DAI')
 
+export const USDB_BLAST = new Token(ChainId.BLAST, '0x4300000000000000000000000000000000000003', 18, 'USDB', 'USDB')
+
 export const USDC_AVALANCHE = new Token(
   ChainId.AVALANCHE,
   '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
@@ -345,6 +343,7 @@ export const WRAPPED_NATIVE_CURRENCY: { [chainId: number]: Token | undefined } =
     'WAVAX',
     'Wrapped AVAX'
   ),
+  [ChainId.BLAST]: new Token(ChainId.BLAST, '0x4300000000000000000000000000000000000004', 18, 'WETH', 'Wrapped Ether'),
 }
 
 export function isCelo(chainId: number): chainId is ChainId.CELO | ChainId.CELO_ALFAJORES {
@@ -428,17 +427,25 @@ class AvaxNativeCurrency extends NativeCurrency {
   }
 }
 
-class ExtendedEther extends Ether {
+class ExtendedEther extends NativeCurrency {
   public get wrapped(): Token {
     const wrapped = WRAPPED_NATIVE_CURRENCY[this.chainId]
     if (wrapped) return wrapped
     throw new Error(`Unsupported chain ID: ${this.chainId}`)
   }
 
+  protected constructor(chainId: number) {
+    super(chainId, 18, 'ETH', 'Ethereum')
+  }
+
   private static _cachedExtendedEther: { [chainId: number]: NativeCurrency } = {}
 
   public static onChain(chainId: number): ExtendedEther {
     return this._cachedExtendedEther[chainId] ?? (this._cachedExtendedEther[chainId] = new ExtendedEther(chainId))
+  }
+
+  public equals(other: Currency): boolean {
+    return other.isNative && other.chainId === this.chainId
   }
 }
 
@@ -471,10 +478,45 @@ export const TOKEN_SHORTHANDS: { [shorthand: string]: { [chainId in ChainId]?: s
     [ChainId.POLYGON_MUMBAI]: USDC_POLYGON_MUMBAI.address,
     [ChainId.BNB]: USDC_BSC.address,
     [ChainId.BASE]: USDC_BASE.address,
-    [ChainId.CELO]: PORTAL_USDC_CELO.address,
-    [ChainId.CELO_ALFAJORES]: PORTAL_USDC_CELO.address,
+    [ChainId.CELO]: USDC_CELO.address,
+    [ChainId.CELO_ALFAJORES]: USDC_CELO.address,
     [ChainId.GOERLI]: USDC_GOERLI.address,
     [ChainId.SEPOLIA]: USDC_SEPOLIA.address,
     [ChainId.AVALANCHE]: USDC_AVALANCHE.address,
   },
 }
+
+const STABLECOINS: { [chainId in ChainId]: Token[] } = {
+  [ChainId.MAINNET]: [USDC_MAINNET, DAI, USDT],
+  [ChainId.ARBITRUM_ONE]: [USDC_ARBITRUM, DAI_ARBITRUM_ONE],
+  [ChainId.ARBITRUM_GOERLI]: [USDC_ARBITRUM_GOERLI],
+  [ChainId.OPTIMISM]: [USDC_OPTIMISM, DAI_OPTIMISM],
+  [ChainId.OPTIMISM_GOERLI]: [USDC_OPTIMISM_GOERLI],
+  [ChainId.POLYGON]: [USDC_POLYGON, DAI_POLYGON],
+  [ChainId.POLYGON_MUMBAI]: [USDC_POLYGON_MUMBAI],
+  [ChainId.BNB]: [USDC_BSC],
+  [ChainId.BASE]: [USDC_BASE],
+  [ChainId.CELO]: [USDC_CELO],
+  [ChainId.CELO_ALFAJORES]: [USDC_CELO],
+  [ChainId.GOERLI]: [USDC_GOERLI],
+  [ChainId.SEPOLIA]: [USDC_SEPOLIA],
+  [ChainId.AVALANCHE]: [USDC_AVALANCHE],
+  [ChainId.GNOSIS]: [],
+  [ChainId.MOONBEAM]: [],
+  [ChainId.BASE_GOERLI]: [],
+  [ChainId.OPTIMISM_SEPOLIA]: [USDC_SEPOLIA],
+  [ChainId.ARBITRUM_SEPOLIA]: [],
+  [ChainId.ZORA_SEPOLIA]: [],
+  [ChainId.ZORA]: [],
+  [ChainId.ROOTSTOCK]: [],
+  [ChainId.BLAST]: [USDB_BLAST],
+}
+
+export function isStablecoin(currency?: Currency): boolean {
+  if (!currency) return false
+
+  return STABLECOINS[currency.chainId as ChainId].some((stablecoin) => stablecoin.equals(currency))
+}
+
+export const UNKNOWN_TOKEN_SYMBOL = 'UNKNOWN'
+export const UNKNOWN_TOKEN_NAME = 'Unknown Token'

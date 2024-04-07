@@ -4,7 +4,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
 <View
   style={
     {
-      "alignItems": "stretch",
       "flexDirection": "column",
       "paddingBottom": 8,
       "paddingLeft": 8,
@@ -17,7 +16,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
     onLayout={[Function]}
     style={
       {
-        "alignItems": "stretch",
         "flexDirection": "column",
         "opacity": 0,
       }
@@ -27,7 +25,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
     <View
       style={
         {
-          "alignItems": "stretch",
           "flexDirection": "column",
           "flexGrow": 1,
           "gap": 4,
@@ -52,7 +49,7 @@ exports[`SearchPopularTokens renders without error 1`] = `
             {
               "alignItems": "center",
               "flexDirection": "row",
-              "flexShrink": 1,
+              "flexGrow": 1,
               "gap": 12,
               "overflow": "hidden",
             }
@@ -61,7 +58,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
           <View
             style={
               {
-                "alignItems": "stretch",
                 "backgroundColor": "#CECECE",
                 "borderBottomLeftRadius": 999999,
                 "borderBottomRightRadius": 999999,
@@ -78,7 +74,7 @@ exports[`SearchPopularTokens renders without error 1`] = `
               {
                 "alignItems": "flex-start",
                 "flexDirection": "column",
-                "flexShrink": 1,
+                "flexGrow": 1,
               }
             }
           >
@@ -125,7 +121,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
                 <View
                   style={
                     {
-                      "alignItems": "stretch",
                       "backgroundColor": "#F9F9F9",
                       "borderBottomLeftRadius": 4,
                       "borderBottomRightRadius": 4,
@@ -195,7 +190,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
                   <View
                     style={
                       {
-                        "alignItems": "stretch",
                         "backgroundColor": "#F9F9F9",
                         "borderBottomLeftRadius": 4,
                         "borderBottomRightRadius": 4,
@@ -234,7 +228,7 @@ exports[`SearchPopularTokens renders without error 1`] = `
             {
               "alignItems": "center",
               "flexDirection": "row",
-              "flexShrink": 1,
+              "flexGrow": 1,
               "gap": 12,
               "overflow": "hidden",
             }
@@ -243,7 +237,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
           <View
             style={
               {
-                "alignItems": "stretch",
                 "backgroundColor": "#CECECE",
                 "borderBottomLeftRadius": 999999,
                 "borderBottomRightRadius": 999999,
@@ -260,7 +253,7 @@ exports[`SearchPopularTokens renders without error 1`] = `
               {
                 "alignItems": "flex-start",
                 "flexDirection": "column",
-                "flexShrink": 1,
+                "flexGrow": 1,
               }
             }
           >
@@ -307,7 +300,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
                 <View
                   style={
                     {
-                      "alignItems": "stretch",
                       "backgroundColor": "#F9F9F9",
                       "borderBottomLeftRadius": 4,
                       "borderBottomRightRadius": 4,
@@ -377,7 +369,6 @@ exports[`SearchPopularTokens renders without error 1`] = `
                   <View
                     style={
                       {
-                        "alignItems": "stretch",
                         "backgroundColor": "#F9F9F9",
                         "borderBottomLeftRadius": 4,
                         "borderBottomRightRadius": 4,
@@ -412,6 +403,7 @@ exports[`SearchPopularTokens renders without error 2`] = `
         "chainId": 1,
         "logoUrl": "https://loremflickr.com/640/480",
         "name": "Ethereum",
+        "safetyLevel": "VERIFIED",
         "symbol": "ETH",
         "type": 1,
       },
@@ -420,6 +412,7 @@ exports[`SearchPopularTokens renders without error 2`] = `
         "chainId": 1,
         "logoUrl": "https://loremflickr.com/640/480",
         "name": "USD Coin",
+        "safetyLevel": "VERIFIED",
         "symbol": "USDC",
         "type": 1,
       },
@@ -462,8 +455,8 @@ exports[`SearchPopularTokens renders without error 2`] = `
             },
             {
               "onPress": [Function],
-              "systemIcon": "doc.on.doc",
-              "title": "Copy contract address",
+              "systemIcon": "qrcode",
+              "title": "Receive",
             },
             {
               "onPress": [Function],
@@ -475,44 +468,28 @@ exports[`SearchPopularTokens renders without error 2`] = `
         onPress={[Function]}
       >
         <View
-          accessibilityState={
-            {
-              "busy": undefined,
-              "checked": undefined,
-              "disabled": undefined,
-              "expanded": undefined,
-              "selected": undefined,
-            }
-          }
-          accessibilityValue={
-            {
-              "max": undefined,
-              "min": undefined,
-              "now": undefined,
-              "text": undefined,
-            }
-          }
-          accessible={true}
-          collapsable={false}
+          cancelable={true}
+          disabled={false}
           focusable={true}
-          hitSlop={
-            {
-              "bottom": 5,
-              "left": 5,
-              "right": 5,
-              "top": 5,
-            }
-          }
-          onClick={[Function]}
-          onResponderGrant={[Function]}
-          onResponderMove={[Function]}
-          onResponderRelease={[Function]}
-          onResponderTerminate={[Function]}
-          onResponderTerminationRequest={[Function]}
-          onStartShouldSetResponder={[Function]}
+          hitSlop={[Function]}
+          minPressDuration={0}
+          onBlur={[Function]}
+          onFocus={[Function]}
+          onLongPress={[Function]}
+          onMouseEnter={[Function]}
+          onMouseLeave={[Function]}
+          onPress={[Function]}
+          onPressIn={[Function]}
+          onPressOut={[Function]}
           style={
             {
+              "flexDirection": "column",
               "opacity": 1,
+              "transform": [
+                {
+                  "scale": 1,
+                },
+              ],
             }
           }
           testID="search-token-item"
@@ -586,7 +563,6 @@ exports[`SearchPopularTokens renders without error 2`] = `
                 <View
                   style={
                     {
-                      "alignItems": "stretch",
                       "flexDirection": "column",
                       "flexShrink": 1,
                     }
@@ -662,8 +638,8 @@ exports[`SearchPopularTokens renders without error 2`] = `
             },
             {
               "onPress": [Function],
-              "systemIcon": "doc.on.doc",
-              "title": "Copy contract address",
+              "systemIcon": "qrcode",
+              "title": "Receive",
             },
             {
               "onPress": [Function],
@@ -675,44 +651,28 @@ exports[`SearchPopularTokens renders without error 2`] = `
         onPress={[Function]}
       >
         <View
-          accessibilityState={
-            {
-              "busy": undefined,
-              "checked": undefined,
-              "disabled": undefined,
-              "expanded": undefined,
-              "selected": undefined,
-            }
-          }
-          accessibilityValue={
-            {
-              "max": undefined,
-              "min": undefined,
-              "now": undefined,
-              "text": undefined,
-            }
-          }
-          accessible={true}
-          collapsable={false}
+          cancelable={true}
+          disabled={false}
           focusable={true}
-          hitSlop={
-            {
-              "bottom": 5,
-              "left": 5,
-              "right": 5,
-              "top": 5,
-            }
-          }
-          onClick={[Function]}
-          onResponderGrant={[Function]}
-          onResponderMove={[Function]}
-          onResponderRelease={[Function]}
-          onResponderTerminate={[Function]}
-          onResponderTerminationRequest={[Function]}
-          onStartShouldSetResponder={[Function]}
+          hitSlop={[Function]}
+          minPressDuration={0}
+          onBlur={[Function]}
+          onFocus={[Function]}
+          onLongPress={[Function]}
+          onMouseEnter={[Function]}
+          onMouseLeave={[Function]}
+          onPress={[Function]}
+          onPressIn={[Function]}
+          onPressOut={[Function]}
           style={
             {
+              "flexDirection": "column",
               "opacity": 1,
+              "transform": [
+                {
+                  "scale": 1,
+                },
+              ],
             }
           }
           testID="search-token-item"
@@ -786,7 +746,6 @@ exports[`SearchPopularTokens renders without error 2`] = `
                 <View
                   style={
                     {
-                      "alignItems": "stretch",
                       "flexDirection": "column",
                       "flexShrink": 1,
                     }
@@ -839,7 +798,6 @@ exports[`SearchPopularTokens renders without error 2`] = `
                 <View
                   style={
                     {
-                      "alignItems": "stretch",
                       "flexDirection": "column",
                       "flexShrink": 1,
                     }

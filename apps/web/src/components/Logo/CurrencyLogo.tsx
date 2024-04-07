@@ -10,11 +10,12 @@ export default function CurrencyLogo(
 ) {
   return (
     <AssetLogo
+      currency={props.currency}
       isNative={props.currency?.isNative}
       chainId={props.currency?.chainId}
       address={props.currency?.wrapped.address}
       symbol={props.symbol ?? props.currency?.symbol}
-      backupImg={(props.currency as TokenInfo)?.logoURI}
+      primaryImg={(props.currency as TokenInfo)?.logoURI}
       {...props}
     />
   )

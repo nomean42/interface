@@ -6,29 +6,35 @@ import { useTranslation } from 'react-i18next'
 import { FlatList, RefreshControl } from 'react-native'
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated'
 import { useAppStackNavigation } from 'src/app/navigation/types'
+import { TokenBalanceItemContextMenu } from 'src/components/TokenBalanceList/TokenBalanceItemContextMenu'
 import { useAdaptiveFooter } from 'src/components/home/hooks'
 import {
-  TabProps,
   TAB_BAR_HEIGHT,
   TAB_VIEW_SCROLL_THROTTLE,
+  TabProps,
 } from 'src/components/layout/TabHelpers'
-import { HiddenTokensRow } from 'src/components/TokenBalanceList/HiddenTokensRow'
-import { TokenBalanceItemContextMenu } from 'src/components/TokenBalanceList/TokenBalanceItemContextMenu'
+import { Screens } from 'src/screens/Screens'
+import {
+  AnimatedFlex,
+  Flex,
+  Loader,
+  useDeviceDimensions,
+  useDeviceInsets,
+  useSporeColors,
+} from 'ui/src'
+import { zIndices } from 'ui/src/theme'
+import { CurrencyId } from 'uniswap/src/types/currency'
+import { isAndroid } from 'uniswap/src/utils/platform'
+import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
+import { isError, isNonPollingRequestInFlight } from 'wallet/src/data/utils'
+import { HiddenTokensRow } from 'wallet/src/features/portfolio/HiddenTokensRow'
+import { TokenBalanceItem } from 'wallet/src/features/portfolio/TokenBalanceItem'
 import {
   HIDDEN_TOKEN_BALANCES_ROW,
   TokenBalanceListContextProvider,
   TokenBalanceListRow,
   useTokenBalanceListContext,
-} from 'src/components/TokenBalanceList/TokenBalanceListContext'
-import { Screens } from 'src/screens/Screens'
-import { AnimatedFlex, Flex, useDeviceDimensions, useDeviceInsets, useSporeColors } from 'ui/src'
-import { zIndices } from 'ui/src/theme'
-import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
-import { TokenLoader } from 'wallet/src/components/loading/TokenLoader'
-import { isError, isNonPollingRequestInFlight } from 'wallet/src/data/utils'
-import { TokenBalanceItem } from 'wallet/src/features/portfolio/TokenBalanceItem'
-import { CurrencyId } from 'wallet/src/utils/currencyId'
-import { isAndroid } from 'wallet/src/utils/platform'
+} from 'wallet/src/features/portfolio/TokenBalanceListContext'
 
 type TokenBalanceListProps = TabProps & {
   empty?: JSX.Element | null
@@ -158,7 +164,7 @@ export const TokenBalanceListInner = forwardRef<
   const ListHeaderComponent = useMemo(() => {
     return hasError ? (
       <AnimatedFlex entering={FadeInDown} exiting={FadeOut} px="$spacing24" py="$spacing8">
-        <BaseCard.InlineErrorState title={t('Failed to fetch token balances')} onRetry={refetch} />
+        <BaseCard.InlineErrorState title={t('home.tokens.error.fetch')} onRetry={refetch} />
       </AnimatedFlex>
     ) : null
   }, [hasError, refetch, t])
@@ -193,13 +199,13 @@ export const TokenBalanceListInner = forwardRef<
       {!balancesById ? (
         isNonPollingRequestInFlight(networkStatus) ? (
           <Flex px="$spacing24" style={containerProps?.loadingContainerStyle}>
-            <TokenLoader repeat={6} />
+            <Loader.Token withPrice repeat={6} />
           </Flex>
         ) : (
           <Flex fill grow justifyContent="center" style={containerProps?.emptyContainerStyle}>
             <BaseCard.ErrorState
-              retryButtonLabel="Retry"
-              title={t('Couldn’t load token balances')}
+              retryButtonLabel={t('common.button.retry')}
+              title={t('home.tokens.error.load')}
               onRetry={(): void | undefined => refetch?.()}
             />
           </Flex>
@@ -256,6 +262,7 @@ const TokenBalanceItemRow = memo(function TokenBalanceItemRow({
   if (item === HIDDEN_TOKEN_BALANCES_ROW) {
     return (
       <HiddenTokensRow
+        padded
         isExpanded={hiddenTokensExpanded}
         numHidden={hiddenTokensCount}
         onPress={(): void => {
@@ -276,7 +283,7 @@ const TokenBalanceItemRow = memo(function TokenBalanceItemRow({
     // As soon as the view comes back into focus, the FlatList will re-render with the latest data, so users won't really see this Skeleton for more than a few milliseconds when this happens.
     return (
       <Flex height={ESTIMATED_TOKEN_ITEM_HEIGHT} px="$spacing24">
-        <TokenLoader />
+        <Loader.Token />
       </Flex>
     )
   }

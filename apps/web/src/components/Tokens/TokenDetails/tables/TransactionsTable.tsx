@@ -1,36 +1,40 @@
+import { ApolloError } from '@apollo/client'
 import { Trans } from '@lingui/macro'
 import { createColumnHelper } from '@tanstack/react-table'
 import { ChainId, Token } from '@uniswap/sdk-core'
+import Row from 'components/Row'
 import { Table } from 'components/Table'
 import { Cell } from 'components/Table/Cell'
 import { Filter } from 'components/Table/Filter'
 import {
-  ClickableHeaderRow,
   FilterHeaderRow,
   HeaderArrow,
+  HeaderSortText,
   StyledExternalLink,
-  StyledInternalLink,
+  TimestampCell,
+  TokenLinkCell,
 } from 'components/Table/styled'
-import { getLocaleTimeString } from 'components/Table/utils'
-import { DEFAULT_LOCALE } from 'constants/locales'
-import { validateUrlChainParam } from 'graphql/data/util'
+import { useUpdateManualOutage } from 'featureFlags/flags/outageBanner'
+import { TokenTransactionType, useTokenTransactions } from 'graphql/data/useTokenTransactions'
+import { unwrapToken } from 'graphql/data/util'
 import { OrderDirection, Swap_OrderBy } from 'graphql/thegraph/__generated__/types-and-hooks'
-import { TokenTransactionType, useTokenTransactions } from 'graphql/thegraph/TokenTransactions'
 import { useActiveLocalCurrency } from 'hooks/useActiveLocalCurrency'
-import { useActiveLocale } from 'hooks/useActiveLocale'
-import { useOnClickOutside } from 'hooks/useOnClickOutside'
-import { useCallback, useMemo, useReducer, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useMemo, useReducer, useState } from 'react'
 import styled from 'styled-components'
 import { EllipsisStyle, ThemedText } from 'theme/components'
-import { shortenAddress } from 'utils/addresses'
+import { Token as GQLToken } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
+import { shortenAddress } from 'utilities/src/addresses'
 import { useFormatter } from 'utils/formatNumbers'
 import { ExplorerDataType, getExplorerLink } from 'utils/getExplorerLink'
 
 const StyledSwapAmount = styled(ThemedText.BodyPrimary)`
   display: inline-block;
   ${EllipsisStyle}
-  max-width: 125px;
+  max-width: 75px;
+`
+
+const TableWrapper = styled.div`
+  min-height: 158px;
 `
 interface SwapTransaction {
   hash: string
@@ -42,9 +46,10 @@ interface SwapTransaction {
 }
 
 interface SwapLeg {
-  address: string
-  symbol: string
+  address?: string
+  symbol?: string
   amount: number
+  token: GQLToken
 }
 
 type TokenTxTableSortState = {
@@ -53,109 +58,94 @@ type TokenTxTableSortState = {
 }
 
 export function TransactionsTable({ chainId, referenceToken }: { chainId: ChainId; referenceToken: Token }) {
-  const locale = useActiveLocale()
   const activeLocalCurrency = useActiveLocalCurrency()
   const { formatNumber, formatFiatPrice } = useFormatter()
-  const chainName = validateUrlChainParam(useParams<{ chainName?: string }>().chainName)
   const [filterModalIsOpen, toggleFilterModal] = useReducer((s) => !s, false)
-  const filterModalRef = useRef<HTMLDivElement>(null)
-  useOnClickOutside(filterModalRef, filterModalIsOpen ? toggleFilterModal : undefined)
   const [filter, setFilters] = useState<TokenTransactionType[]>([TokenTransactionType.BUY, TokenTransactionType.SELL])
-  const [sortState, setSortMethod] = useState<TokenTxTableSortState>({
+  const [sortState] = useState<TokenTxTableSortState>({
     sortBy: Swap_OrderBy.Timestamp,
     sortDirection: OrderDirection.Desc,
   })
-  const { transactions, loading, loadMore } = useTokenTransactions(
+  const { transactions, loading, loadMore, errorV2, errorV3 } = useTokenTransactions(
     referenceToken.address,
     chainId,
-    sortState.sortBy,
-    sortState.sortDirection,
     filter
   )
-
-  const handleHeaderClick = useCallback(
-    (newSortMethod: Swap_OrderBy) => {
-      if (sortState.sortBy === newSortMethod) {
-        setSortMethod({
-          sortBy: newSortMethod,
-          sortDirection: sortState.sortDirection === OrderDirection.Asc ? OrderDirection.Desc : OrderDirection.Asc,
+  const combinedError =
+    errorV2 && errorV3
+      ? new ApolloError({
+          errorMessage: `Could not retrieve V2 and V3 Transactions for token: ${referenceToken.address} on chain: ${chainId}`,
         })
-      } else {
-        setSortMethod({
-          sortBy: newSortMethod,
-          sortDirection: OrderDirection.Desc,
-        })
-      }
-    },
-    [sortState.sortBy, sortState.sortDirection]
-  )
+      : undefined
+  const allDataStillLoading = loading && !transactions.length
+  useUpdateManualOutage({ chainId, errorV3, errorV2 })
+  const unwrappedReferenceToken = unwrapToken(chainId, referenceToken)
 
   const data = useMemo(
     () =>
       transactions.map((transaction) => {
         const swapLeg0 = {
-          address: transaction.pool.token0.id,
-          symbol: transaction.pool.token0.symbol,
-          amount: transaction.amount0,
+          address: transaction.token0.address,
+          symbol: transaction.token0.symbol,
+          amount: parseFloat(transaction.token0Quantity),
+          token: transaction.token0,
         }
         const swapLeg1 = {
-          address: transaction.pool.token1.id,
-          symbol: transaction.pool.token1.symbol,
-          amount: transaction.amount1,
+          address: transaction.token1.address,
+          symbol: transaction.token1.symbol,
+          amount: parseFloat(transaction.token1Quantity),
+          token: transaction.token1,
         }
-        let input, output
-        if (swapLeg0.amount > 0) {
-          input = swapLeg0
-          output = swapLeg1
-        } else {
-          input = swapLeg1
-          output = swapLeg0
-        }
+        const token0IsBeingSold = parseFloat(transaction.token0Quantity) < 0
         return {
-          hash: transaction.transaction.id,
+          hash: transaction.hash,
           timestamp: transaction.timestamp,
-          input,
-          output,
-          usdValue: transaction.amountUSD,
-          makerAddress: transaction.origin,
+          input: token0IsBeingSold ? swapLeg0 : swapLeg1,
+          output: token0IsBeingSold ? swapLeg1 : swapLeg0,
+          usdValue: transaction.usdValue.value,
+          makerAddress: transaction.account,
         }
       }),
     [transactions]
   )
+
+  const showLoadingSkeleton = allDataStillLoading || !!combinedError
   // TODO(WEB-3236): once GQL BE Transaction query is supported add usd, token0 amount, and token1 amount sort support
   const columns = useMemo(() => {
     const columnHelper = createColumnHelper<SwapTransaction>()
     return [
-      columnHelper.accessor((row) => row.timestamp, {
+      columnHelper.accessor((row) => row, {
         id: 'timestamp',
         header: () => (
-          <Cell minWidth={150} justifyContent="flex-start" grow>
-            <ClickableHeaderRow $justify="flex-start" onClick={() => handleHeaderClick(Swap_OrderBy.Timestamp)}>
+          <Cell minWidth={120} justifyContent="flex-start" grow>
+            <Row gap="xs">
               {sortState.sortBy === Swap_OrderBy.Timestamp && <HeaderArrow direction={sortState.sortDirection} />}
-              <ThemedText.BodySecondary>
+              <HeaderSortText $active={sortState.sortBy === Swap_OrderBy.Timestamp}>
                 <Trans>Time</Trans>
-              </ThemedText.BodySecondary>
-            </ClickableHeaderRow>
+              </HeaderSortText>
+            </Row>
           </Cell>
         ),
-        cell: (timestamp) => (
-          <Cell loading={loading} minWidth={150} justifyContent="flex-start" grow>
-            <ThemedText.BodySecondary>
-              {getLocaleTimeString(Number(timestamp.getValue?.()) * 1000, locale ?? DEFAULT_LOCALE)}
-            </ThemedText.BodySecondary>
+        cell: (row) => (
+          <Cell loading={showLoadingSkeleton} minWidth={120} justifyContent="flex-start" grow>
+            <TimestampCell
+              timestamp={Number(row.getValue?.().timestamp)}
+              link={getExplorerLink(chainId, row.getValue?.().hash, ExplorerDataType.TRANSACTION)}
+            />
           </Cell>
         ),
       }),
       columnHelper.accessor((row) => row.output.address, {
         id: 'swap-type',
         header: () => (
-          <Cell minWidth={50} justifyContent="flex-start" grow>
-            <FilterHeaderRow modalOpen={filterModalIsOpen} onClick={toggleFilterModal} ref={filterModalRef}>
+          <Cell minWidth={75} justifyContent="flex-start" grow>
+            <FilterHeaderRow modalOpen={filterModalIsOpen} onClick={toggleFilterModal}>
               <Filter
                 allFilters={Object.values(TokenTransactionType)}
                 activeFilter={filter}
                 setFilters={setFilters}
                 isOpen={filterModalIsOpen}
+                toggleFilterModal={toggleFilterModal}
               />
               <ThemedText.BodySecondary>
                 <Trans>Type</Trans>
@@ -163,32 +153,31 @@ export function TransactionsTable({ chainId, referenceToken }: { chainId: ChainI
             </FilterHeaderRow>
           </Cell>
         ),
-        cell: (outputTokenAddress) => (
-          <Cell loading={loading} minWidth={50} justifyContent="flex-start" grow>
-            <ThemedText.BodyPrimary>
-              {String(outputTokenAddress.getValue?.()).toLowerCase() === referenceToken.address.toLowerCase() ? (
-                <Trans>Buy</Trans>
-              ) : (
-                <Trans>Sell</Trans>
-              )}
-            </ThemedText.BodyPrimary>
-          </Cell>
-        ),
+        cell: (outputTokenAddress) => {
+          const isBuy = String(outputTokenAddress.getValue?.()).toLowerCase() === referenceToken.address.toLowerCase()
+          return (
+            <Cell loading={showLoadingSkeleton} minWidth={75} justifyContent="flex-start" grow>
+              <ThemedText.BodyPrimary color={isBuy ? 'success' : 'critical'}>
+                {isBuy ? <Trans>Buy</Trans> : <Trans>Sell</Trans>}
+              </ThemedText.BodyPrimary>
+            </Cell>
+          )
+        },
       }),
       columnHelper.accessor(
         (row) =>
-          row.input.address.toLowerCase() === referenceToken.address.toLowerCase()
+          row.input.address?.toLowerCase() === referenceToken.address.toLowerCase()
             ? row.input.amount
             : row.output.amount,
         {
           id: 'reference-amount',
           header: () => (
-            <Cell minWidth={150} justifyContent="flex-end">
-              <ThemedText.BodySecondary>${referenceToken.symbol}</ThemedText.BodySecondary>
+            <Cell minWidth={100} justifyContent="flex-end">
+              <ThemedText.BodySecondary>${unwrappedReferenceToken.symbol}</ThemedText.BodySecondary>
             </Cell>
           ),
           cell: (inputTokenAmount) => (
-            <Cell loading={loading} minWidth={150} justifyContent="flex-end">
+            <Cell loading={showLoadingSkeleton} minWidth={100} justifyContent="flex-end">
               <ThemedText.BodyPrimary>
                 {formatNumber({
                   input: Math.abs(inputTokenAmount.getValue?.()) || 0,
@@ -201,29 +190,29 @@ export function TransactionsTable({ chainId, referenceToken }: { chainId: ChainI
       columnHelper.accessor(
         (row) => {
           const nonReferenceSwapLeg =
-            row.input.address.toLowerCase() === referenceToken.address.toLowerCase() ? row.output : row.input
+            row.input.address?.toLowerCase() === referenceToken.address.toLowerCase() ? row.output : row.input
           return (
-            <StyledSwapAmount>
-              {formatNumber({
-                input: Math.abs(nonReferenceSwapLeg.amount) || 0,
-              })}{' '}
-              <StyledInternalLink to={`/explore/tokens/${chainName.toLowerCase()}/${nonReferenceSwapLeg.address}`}>
-                {nonReferenceSwapLeg.symbol}
-              </StyledInternalLink>
-            </StyledSwapAmount>
+            <Row gap="8px" justify="flex-end">
+              <StyledSwapAmount>
+                {formatNumber({
+                  input: Math.abs(nonReferenceSwapLeg.amount) || 0,
+                })}
+              </StyledSwapAmount>
+              <TokenLinkCell token={nonReferenceSwapLeg.token} />
+            </Row>
           )
         },
         {
           id: 'non-reference-amount',
           header: () => (
-            <Cell minWidth={150} justifyContent="flex-end">
+            <Cell minWidth={160} justifyContent="flex-end">
               <ThemedText.BodySecondary>
                 <Trans>For</Trans>
               </ThemedText.BodySecondary>
             </Cell>
           ),
           cell: (swapOutput) => (
-            <Cell loading={loading} minWidth={150} justifyContent="flex-end">
+            <Cell loading={showLoadingSkeleton} minWidth={160} justifyContent="flex-end">
               {swapOutput.getValue?.()}
             </Cell>
           ),
@@ -233,14 +222,16 @@ export function TransactionsTable({ chainId, referenceToken }: { chainId: ChainI
         id: 'fiat-value',
         header: () => (
           <Cell minWidth={125} justifyContent="flex-end">
-            <ClickableHeaderRow $justify="flex-end" onClick={() => handleHeaderClick(Swap_OrderBy.AmountUsd)}>
+            <Row gap="xs" justify="flex-end">
               {sortState.sortBy === Swap_OrderBy.AmountUsd && <HeaderArrow direction={sortState.sortDirection} />}
-              <ThemedText.BodySecondary>{activeLocalCurrency}</ThemedText.BodySecondary>
-            </ClickableHeaderRow>
+              <HeaderSortText $active={sortState.sortBy === Swap_OrderBy.AmountUsd}>
+                {activeLocalCurrency}
+              </HeaderSortText>
+            </Row>
           </Cell>
         ),
         cell: (fiat) => (
-          <Cell loading={loading} minWidth={125} justifyContent="flex-end">
+          <Cell loading={showLoadingSkeleton} minWidth={125} justifyContent="flex-end">
             <ThemedText.BodyPrimary>{formatFiatPrice({ price: fiat.getValue?.() })}</ThemedText.BodyPrimary>
           </Cell>
         ),
@@ -248,37 +239,45 @@ export function TransactionsTable({ chainId, referenceToken }: { chainId: ChainI
       columnHelper.accessor((row) => row.makerAddress, {
         id: 'maker-address',
         header: () => (
-          <Cell minWidth={100} justifyContent="flex-end">
+          <Cell minWidth={150} justifyContent="flex-end">
             <ThemedText.BodySecondary>
               <Trans>Wallet</Trans>
             </ThemedText.BodySecondary>
           </Cell>
         ),
         cell: (makerAddress) => (
-          <Cell loading={loading} minWidth={100} justifyContent="flex-end">
+          <Cell loading={showLoadingSkeleton} minWidth={150} justifyContent="flex-end">
             <StyledExternalLink href={getExplorerLink(chainId, makerAddress.getValue?.(), ExplorerDataType.ADDRESS)}>
-              {shortenAddress(makerAddress.getValue?.(), 0)}
+              {shortenAddress(makerAddress.getValue?.())}
             </StyledExternalLink>
           </Cell>
         ),
       }),
     ]
   }, [
-    activeLocalCurrency,
-    chainId,
-    chainName,
-    filter,
-    filterModalIsOpen,
-    formatFiatPrice,
-    formatNumber,
-    handleHeaderClick,
-    loading,
-    locale,
-    referenceToken.address,
-    referenceToken.symbol,
     sortState.sortBy,
     sortState.sortDirection,
+    showLoadingSkeleton,
+    chainId,
+    filterModalIsOpen,
+    filter,
+    referenceToken.address,
+    unwrappedReferenceToken.symbol,
+    formatNumber,
+    activeLocalCurrency,
+    formatFiatPrice,
   ])
 
-  return <Table columns={columns} data={data} loading={loading} loadMore={loadMore} maxHeight={600} />
+  return (
+    <TableWrapper>
+      <Table
+        columns={columns}
+        data={data}
+        loading={allDataStillLoading}
+        error={combinedError}
+        loadMore={loadMore}
+        maxHeight={600}
+      />
+    </TableWrapper>
+  )
 }

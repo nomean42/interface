@@ -8,13 +8,13 @@ import {
 import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
 import { UNIVERSAL_ROUTER_ADDRESS } from '@uniswap/universal-router-sdk'
 import dayjs from 'dayjs'
-import { BigNumber, providers, TypedDataField } from 'ethers'
+import { BigNumber, TypedDataField, providers } from 'ethers'
 import { useCallback } from 'react'
 import { logger } from 'utilities/src/logger/logger'
 import { useAsyncData } from 'utilities/src/react/hooks'
 import { currentTimeInSeconds, inXMinutesUnix } from 'utilities/src/time/time'
 import { ChainId } from 'wallet/src/constants/chains'
-import { Permit } from 'wallet/src/data/tradingApi/__generated__/api'
+import { Permit } from 'wallet/src/data/tradingApi/__generated__/index'
 import { Account, AccountType } from 'wallet/src/features/wallet/accounts/types'
 import { useProvider, useWalletSigners } from 'wallet/src/features/wallet/context'
 import { useActiveAccountWithThrow } from 'wallet/src/features/wallet/hooks'
@@ -105,6 +105,7 @@ async function getPermit2PermitSignature(
     }
   } catch (error) {
     logger.error(error, { tags: { file: 'usePermit2Signature', function: 'getPermit2Signature' } })
+    return
   }
 }
 

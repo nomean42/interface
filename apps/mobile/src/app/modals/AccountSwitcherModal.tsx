@@ -8,7 +8,9 @@ import { AccountList } from 'src/components/accounts/AccountList'
 import { isCloudStorageAvailable } from 'src/features/CloudBackup/RNCloudStorageBackupsManager'
 import { closeModal, openModal } from 'src/features/modals/modalSlice'
 import { selectModalState } from 'src/features/modals/selectModalState'
+import { useCompleteOnboardingCallback } from 'src/features/onboarding/hooks'
 import { OnboardingScreens, Screens } from 'src/screens/Screens'
+import { useSagaStatus } from 'src/utils/useSagaStatus'
 import {
   Button,
   Flex,
@@ -20,12 +22,18 @@ import {
   useSporeColors,
 } from 'ui/src'
 import { spacing } from 'ui/src/theme'
+import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
+import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
+import { isAndroid } from 'uniswap/src/utils/platform'
 import { AddressDisplay } from 'wallet/src/components/accounts/AddressDisplay'
 import { ActionSheetModal, MenuItemProp } from 'wallet/src/components/modals/ActionSheetModal'
 import { BottomSheetModal } from 'wallet/src/components/modals/BottomSheetModal'
 import { ImportType, OnboardingEntryPoint } from 'wallet/src/features/onboarding/types'
 import { AccountType } from 'wallet/src/features/wallet/accounts/types'
-import { createAccountActions } from 'wallet/src/features/wallet/create/createAccountSaga'
+import {
+  createAccountActions,
+  createAccountSagaName,
+} from 'wallet/src/features/wallet/create/createAccountSaga'
 import {
   PendingAccountActions,
   pendingAccountActions,
@@ -35,7 +43,6 @@ import { selectAllAccountsSorted } from 'wallet/src/features/wallet/selectors'
 import { setAccountAsActive } from 'wallet/src/features/wallet/slice'
 import { ElementName, ModalName } from 'wallet/src/telemetry/constants'
 import { openSettings } from 'wallet/src/utils/linking'
-import { isAndroid } from 'wallet/src/utils/platform'
 
 export function AccountSwitcherModal(): JSX.Element {
   const dispatch = useAppDispatch()
@@ -46,7 +53,7 @@ export function AccountSwitcherModal(): JSX.Element {
       backgroundColor={colors.surface1.get()}
       name={ModalName.AccountSwitcher}
       onClose={(): Action => dispatch(closeModal({ name: ModalName.AccountSwitcher }))}>
-      <Flex bg="$surface1">
+      <Flex backgroundColor="$surface1">
         <AccountSwitcher
           onClose={(): void => {
             dispatch(closeModal({ name: ModalName.AccountSwitcher }))
@@ -69,8 +76,14 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
   const dispatch = useAppDispatch()
   const hasImportedSeedPhrase = useNativeAccountExists()
   const modalState = useAppSelector(selectModalState(ModalName.AccountSwitcher))
+  const unitagsFeatureFlagEnabled = useFeatureFlag(FeatureFlags.Unitags)
+  const onCompleteOnboarding = useCompleteOnboardingCallback({
+    entryPoint: OnboardingEntryPoint.Sidebar,
+    importType: hasImportedSeedPhrase ? ImportType.CreateAdditional : ImportType.CreateNew,
+  })
 
   const [showAddWalletModal, setShowAddWalletModal] = useState(false)
+  const [createdAdditionalAccount, setCreatedAdditionalAccount] = useState(false)
 
   const accounts = useAppSelector(selectAllAccountsSorted)
 
@@ -105,19 +118,43 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
     })
   }
 
+  // Pick up account creation and activate
+  useSagaStatus(createAccountSagaName, async () => {
+    if (createdAdditionalAccount) {
+      setCreatedAdditionalAccount(false)
+      await onCompleteOnboarding()
+    }
+  })
+
   const addWalletOptions = useMemo<MenuItemProp[]>(() => {
     const onPressCreateNewWallet = (): void => {
-      // Clear any existing pending accounts first.
-      dispatch(pendingAccountActions.trigger(PendingAccountActions.Delete))
+      // Ensure no pending accounts
+      dispatch(pendingAccountActions.trigger(PendingAccountActions.ActivateOneAndDelete))
       dispatch(createAccountActions.trigger())
 
-      navigate(Screens.OnboardingStack, {
-        screen: OnboardingScreens.EditName,
-        params: {
-          importType: hasImportedSeedPhrase ? ImportType.CreateAdditional : ImportType.CreateNew,
-          entryPoint: OnboardingEntryPoint.Sidebar,
-        },
-      })
+      if (unitagsFeatureFlagEnabled) {
+        if (hasImportedSeedPhrase) {
+          setCreatedAdditionalAccount(true)
+        } else {
+          // create pending account and place into welcome flow
+          navigate(Screens.OnboardingStack, {
+            screen: OnboardingScreens.WelcomeWallet,
+            params: {
+              importType: ImportType.CreateNew,
+              entryPoint: OnboardingEntryPoint.Sidebar,
+            },
+          })
+        }
+      } else {
+        navigate(Screens.OnboardingStack, {
+          screen: OnboardingScreens.EditName,
+          params: {
+            entryPoint: OnboardingEntryPoint.Sidebar,
+            importType: hasImportedSeedPhrase ? ImportType.CreateAdditional : ImportType.CreateNew,
+          },
+        })
+      }
+
       setShowAddWalletModal(false)
       onClose()
     }
@@ -153,17 +190,19 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
 
       if (!cloudStorageAvailable) {
         Alert.alert(
-          isAndroid ? t('Google Drive not available') : t('iCloud Drive not available'),
           isAndroid
-            ? t(
-                'Please verify that you are logged in to a Google account with Google Drive enabled on this device and try again.'
-              )
-            : t(
-                'Please verify that you are logged in to an Apple ID with iCloud Drive enabled on this device and try again.'
-              ),
+            ? t('account.cloud.error.unavailable.title.android')
+            : t('account.cloud.error.unavailable.title.ios'),
+          isAndroid
+            ? t('account.cloud.error.unavailable.message.android')
+            : t('account.cloud.error.unavailable.message.ios'),
           [
-            { text: t('Go to settings'), onPress: openSettings, style: 'default' },
-            { text: t('Not now'), style: 'cancel' },
+            {
+              text: t('account.cloud.error.unavailable.button.settings'),
+              onPress: openSettings,
+              style: 'default',
+            },
+            { text: t('account.cloud.error.unavailable.button.cancel'), style: 'cancel' },
           ]
         )
         return
@@ -187,7 +226,7 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
             borderBottomColor="$surface3"
             borderBottomWidth={1}
             p="$spacing16">
-            <Text variant="body1">{t('Create a new wallet')}</Text>
+            <Text variant="body1">{t('account.wallet.button.create')}</Text>
           </Flex>
         ),
       },
@@ -196,7 +235,7 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
         onPress: onPressAddViewOnlyWallet,
         render: () => (
           <Flex alignItems="center" p="$spacing16">
-            <Text variant="body1">{t('Add a view-only wallet')}</Text>
+            <Text variant="body1">{t('account.wallet.button.addViewOnly')}</Text>
           </Flex>
         ),
       },
@@ -205,7 +244,7 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
         onPress: onPressImportWallet,
         render: () => (
           <Flex alignItems="center" borderTopColor="$surface3" borderTopWidth={1} p="$spacing16">
-            <Text variant="body1">{t('Import a new wallet')}</Text>
+            <Text variant="body1">{t('account.wallet.button.import')}</Text>
           </Flex>
         ),
       },
@@ -218,7 +257,9 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
         render: () => (
           <Flex alignItems="center" borderTopColor="$surface3" borderTopWidth={1} p="$spacing16">
             <Text variant="body1">
-              {isAndroid ? t('Restore from Google Drive') : t('Restore from iCloud')}
+              {isAndroid
+                ? t('account.cloud.button.restore.android')
+                : t('account.cloud.button.restore.ios')}
             </Text>
           </Flex>
         ),
@@ -226,7 +267,7 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
     }
 
     return options
-  }, [activeAccountAddress, dispatch, hasImportedSeedPhrase, onClose, t])
+  }, [activeAccountAddress, dispatch, hasImportedSeedPhrase, onClose, t, unitagsFeatureFlagEnabled])
 
   const accountsWithoutActive = accounts.filter((a) => a.address !== activeAccountAddress)
 
@@ -250,6 +291,7 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
           horizontalGap="$spacing8"
           showViewOnlyBadge={isViewOnly}
           size={spacing.spacing60 - spacing.spacing4}
+          variant="subheading1"
         />
         <Flex px="$spacing24">
           <Button
@@ -257,7 +299,7 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
             testID={ElementName.WalletSettings}
             theme="secondary"
             onPress={onManageWallet}>
-            {t('Manage wallet')}
+            {t('account.wallet.button.manage')}
           </Button>
         </Flex>
       </Flex>
@@ -272,7 +314,7 @@ export function AccountSwitcher({ onClose }: { onClose: () => void }): JSX.Eleme
             <Icons.Plus color="$neutral2" size="$icon.12" strokeWidth={2} />
           </Flex>
           <Text color="$neutral2" variant="buttonLabel3">
-            {t('Add wallet')}
+            {t('account.wallet.button.add')}
           </Text>
         </Flex>
       </TouchableArea>

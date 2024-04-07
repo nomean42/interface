@@ -6,6 +6,7 @@ import { Route as V2Route } from '@uniswap/v2-sdk'
 import { Route as V3Route } from '@uniswap/v3-sdk'
 import { ZERO_PERCENT } from 'constants/misc'
 import { BigNumber } from 'ethers/lib/ethers'
+import { SignatureType } from 'state/signatures/types'
 
 export enum TradeState {
   LOADING = 'loading',
@@ -52,7 +53,6 @@ export interface GetQuoteArgs {
   needsWrapIfUniswapX: boolean
   uniswapXForceSyntheticQuotes: boolean
   sendPortionEnabled: boolean
-  gatewayDNSUpdateEnabled: boolean
 }
 
 export type GetQuickQuoteArgs = {
@@ -68,7 +68,6 @@ export type GetQuickQuoteArgs = {
   tradeType: TradeType
   inputTax: Percent
   outputTax: Percent
-  gatewayDNSUpdateAllEnabled: boolean
 }
 
 // from https://github.com/Uniswap/routing-api/blob/main/lib/handlers/schema.ts
@@ -277,9 +276,16 @@ export class ClassicTrade extends Trade<Currency, Currency, TradeType> {
   }
 }
 
-enum OffchainOrderType {
-  DUTCH_AUCTION = 'dutch_auction',
-  LIMIT_ORDER = 'limit_order',
+export enum OffchainOrderType {
+  DUTCH_AUCTION = 'Dutch',
+  DUTCH_V2_AUCTION = 'Dutch_V2',
+  LIMIT_ORDER = 'Limit',
+}
+
+export const OFFCHAIN_ORDER_TYPE_TO_SIGNATURE_TYPE: Record<OffchainOrderType, SignatureType> = {
+  [OffchainOrderType.DUTCH_AUCTION]: SignatureType.SIGN_UNISWAPX_ORDER,
+  [OffchainOrderType.DUTCH_V2_AUCTION]: SignatureType.SIGN_UNISWAPX_V2_ORDER,
+  [OffchainOrderType.LIMIT_ORDER]: SignatureType.SIGN_LIMIT,
 }
 
 export class DutchOrderTrade extends IDutchOrderTrade<Currency, Currency, TradeType> {
@@ -464,7 +470,6 @@ export class LimitOrderTrade {
   amountIn: CurrencyAmount<Token>
   amountOut: CurrencyAmount<Currency>
   tradeType: TradeType
-  nonce: BigNumber
   swapper: string
   deadline: number
 
@@ -480,7 +485,6 @@ export class LimitOrderTrade {
     amountIn,
     amountOut,
     deadlineBufferSecs,
-    nonce,
     swapFee,
     wrapInfo,
     approveInfo,
@@ -490,7 +494,6 @@ export class LimitOrderTrade {
     amountIn: CurrencyAmount<Token>
     amountOut: CurrencyAmount<Currency>
     deadlineBufferSecs: number
-    nonce: BigNumber
     swapFee?: SwapFeeInfo
     wrapInfo: WrapInfo
     approveInfo: ApproveInfo
@@ -503,7 +506,6 @@ export class LimitOrderTrade {
     this.amountIn = amountIn
     this.amountOut = amountOut
     this.tradeType = tradeType
-    this.nonce = nonce
     this.swapper = swapper
     // deadline is shown in the review modal, but updated on submission
     const nowSecs = Math.floor(Date.now() / 1000)
@@ -511,9 +513,25 @@ export class LimitOrderTrade {
   }
 
   public asDutchOrderTrade(options?: {
-    nonce?: BigNumber
-    swapper?: string
+    nonce: BigNumber
+    swapper: string
   }): IDutchOrderTrade<Currency, Currency, TradeType> {
+    const swapperOutput = {
+      token: this.amountOut.currency.isNative ? AddressZero : this.amountOut.currency.address,
+      recipient: options?.swapper ?? this.swapper,
+      startAmount: BigNumber.from(this.amountOut.quotient.toString()),
+      endAmount: BigNumber.from(this.amountOut.quotient.toString()),
+    }
+
+    const swapFee = this.swapFee && {
+      token: this.amountOut.currency.isNative ? AddressZero : this.amountOut.currency.address,
+      recipient: this.swapFee.recipient,
+      startAmount: BigNumber.from(this.amountOut.multiply(this.swapFee.percent).quotient.toString()),
+      endAmount: BigNumber.from(this.amountOut.multiply(this.swapFee.percent).quotient.toString()),
+    }
+
+    const outputs = swapFee ? [swapperOutput, swapFee] : [swapperOutput]
+
     const nowSecs = Math.floor(Date.now() / 1000)
     return new IDutchOrderTrade({
       currencyIn: this.amountIn.currency,
@@ -524,7 +542,7 @@ export class LimitOrderTrade {
         deadline: (nowSecs + this.deadlineBufferSecs) * 1000,
         additionalValidationContract: AddressZero,
         additionalValidationData: '0x',
-        nonce: options?.nonce ?? this.nonce,
+        nonce: options?.nonce ?? BigNumber.from(0),
         // decay timings dont matter at all
         decayStartTime: nowSecs,
         decayEndTime: nowSecs,
@@ -535,14 +553,7 @@ export class LimitOrderTrade {
           startAmount: BigNumber.from(this.amountIn.quotient.toString()),
           endAmount: BigNumber.from(this.amountIn.quotient.toString()),
         },
-        outputs: [
-          {
-            token: this.amountOut.currency.isNative ? AddressZero : this.amountOut.currency.address,
-            recipient: options?.swapper ?? this.swapper,
-            startAmount: BigNumber.from(this.amountOut.quotient.toString()),
-            endAmount: BigNumber.from(this.amountOut.quotient.toString()),
-          },
-        ],
+        outputs,
       },
       tradeType: this.tradeType,
     })
@@ -574,8 +585,9 @@ export class LimitOrderTrade {
     return 0
   }
 
+  // no decay auction for limit orders
   public get auctionPeriodSecs(): number {
-    return this.deadlineBufferSecs
+    return 0
   }
 
   public get executionPrice(): Price<Currency, Currency> {

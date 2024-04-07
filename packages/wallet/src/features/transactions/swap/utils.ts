@@ -8,12 +8,14 @@ import {
 import { FeeOptions } from '@uniswap/v3-sdk'
 import { BigNumber } from 'ethers'
 import { AppTFunction } from 'ui/src/i18n/types'
+import { CurrencyId } from 'uniswap/src/types/currency'
 import { NumberType } from 'utilities/src/format/types'
 import { ChainId } from 'wallet/src/constants/chains'
 import { AssetType } from 'wallet/src/entities/assets'
 import { LocalizationContextState } from 'wallet/src/features/language/LocalizationContext'
+import { isClassicQuote } from 'wallet/src/features/transactions/swap/trade/tradingApi/utils'
+import { QuoteData, Trade } from 'wallet/src/features/transactions/swap/trade/types'
 import { PermitSignatureInfo } from 'wallet/src/features/transactions/swap/usePermit2Signature'
-import { Trade } from 'wallet/src/features/transactions/swap/useTrade'
 import {
   CurrencyField,
   TransactionState,
@@ -26,12 +28,10 @@ import {
 } from 'wallet/src/features/transactions/types'
 import { QuoteType } from 'wallet/src/features/transactions/utils'
 import { ElementName, ElementNameType } from 'wallet/src/telemetry/constants'
-import { areAddressesEqual } from 'wallet/src/utils/addresses'
 import { getSymbolDisplayText } from 'wallet/src/utils/currency'
 import {
   areCurrencyIdsEqual,
   buildWrappedNativeCurrencyId,
-  CurrencyId,
   currencyId,
   currencyIdToAddress,
   currencyIdToChain,
@@ -45,26 +45,6 @@ export function serializeQueryParams(
     queryString.push(`${encodeURIComponent(param)}=${encodeURIComponent(value)}`)
   }
   return queryString.join('&')
-}
-
-export const clearStaleTrades = (
-  trade: Trade,
-  currencyIn: Maybe<Currency>,
-  currencyOut: Maybe<Currency>
-): Trade | null => {
-  const currencyInAddress = currencyIn?.wrapped.address
-  const currencyOutAddress = currencyOut?.wrapped.address
-
-  const inputsMatch =
-    !!currencyInAddress &&
-    areAddressesEqual(currencyInAddress, trade?.inputAmount.currency.wrapped.address)
-  const outputsMatch =
-    !!currencyOutAddress &&
-    areAddressesEqual(currencyOutAddress, trade?.outputAmount.currency.wrapped.address)
-
-  // if the addresses entered by the user don't match what is being returned by the quote endpoint
-  // then set `trade` to null
-  return inputsMatch && outputsMatch ? trade : null
 }
 
 export function getWrapType(
@@ -103,12 +83,7 @@ export function tradeToTransactionInfo(
   const slippageTolerancePercent = slippageToleranceToPercent(trade.slippageTolerance)
   const { quoteData, slippageTolerance } = trade
 
-  // TODO: add additional fields when trading api adds them
-  // https://linear.app/uniswap/issue/MOB-2453/add-additional-properties-to-trading-api
-  const routingApiQuote =
-    quoteData?.quoteType === QuoteType.RoutingApi ? quoteData.quote : undefined
-
-  const { quoteId, gasUseEstimate, routeString } = routingApiQuote || {}
+  const { quoteId, gasUseEstimate, routeString } = parseQuoteTypeSpecificParms(quoteData)
 
   const baseTransactionInfo = {
     inputCurrencyId: currencyId(trade.inputAmount.currency),
@@ -118,6 +93,7 @@ export function tradeToTransactionInfo(
     gasUseEstimate,
     routeString,
     protocol: getProtocolVersionFromTrade(trade),
+    quoteType: quoteData?.quoteType,
   }
 
   return trade.tradeType === TradeType.EXACT_INPUT
@@ -141,6 +117,29 @@ export function tradeToTransactionInfo(
           .maximumAmountIn(slippageTolerancePercent)
           .quotient.toString(),
       }
+}
+
+function parseQuoteTypeSpecificParms(quoteData: QuoteData | undefined): {
+  gasUseEstimate: string | undefined
+  routeString: string | undefined
+  quoteId: string | undefined
+} {
+  const isLegacyQuote = quoteData?.quoteType === QuoteType.RoutingApi
+  const maybeTradingApiQuote = !isLegacyQuote
+    ? isClassicQuote(quoteData?.quote?.quote)
+      ? quoteData?.quote?.quote
+      : undefined
+    : undefined
+
+  const quoteId = isLegacyQuote ? quoteData?.quote?.quoteId : maybeTradingApiQuote?.quoteId
+  const gasUseEstimate = isLegacyQuote
+    ? quoteData.quote?.gasUseEstimate
+    : maybeTradingApiQuote?.gasFeeUSD
+  const routeString = isLegacyQuote
+    ? quoteData?.quote?.routeString
+    : maybeTradingApiQuote?.routeString
+
+  return { quoteId, gasUseEstimate, routeString }
 }
 
 // any price movement below ACCEPT_NEW_TRADE_THRESHOLD is auto-accepted for the user
@@ -178,11 +177,11 @@ export const getRateToDisplay = (
 export const getActionName = (t: AppTFunction, wrapType: WrapType): string => {
   switch (wrapType) {
     case WrapType.Unwrap:
-      return t('Unwrap')
+      return t('swap.button.unwrap')
     case WrapType.Wrap:
-      return t('Wrap')
+      return t('swap.button.wrap')
     default:
-      return t('Swap')
+      return t('swap.button.swap')
   }
 }
 
@@ -246,11 +245,12 @@ export const getSwapMethodParameters = ({
   flatFeeOptions,
 }: MethodParameterArgs): { calldata: string; value: string } => {
   const slippageTolerancePercent = slippageToleranceToPercent(trade.slippageTolerance)
-  const baseOptions = {
+  const baseOptions: UniversalRouterSwapOptions = {
     slippageTolerance: slippageTolerancePercent,
     recipient: address,
     fee: feeOptions,
     flatFee: flatFeeOptions,
+    deadlineOrPreviousBlockhash: trade.deadline,
   }
 
   const universalRouterSwapOptions: UniversalRouterSwapOptions = permit2Signature

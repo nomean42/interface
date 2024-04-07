@@ -3,24 +3,26 @@ import { useTranslation } from 'react-i18next'
 import { NativeSyntheticEvent, Share } from 'react-native'
 import { ContextMenuAction, ContextMenuOnPressNativeEvent } from 'react-native-context-menu-view'
 import { useAppDispatch } from 'src/app/hooks'
+import { ScannerModalState } from 'src/components/QRCodeScanner/constants'
+import { openModal } from 'src/features/modals/modalSlice'
 import { useNavigateToSend } from 'src/features/send/hooks'
-import { useNavigateToSwap } from 'src/features/swap/hooks'
 import { sendMobileAnalyticsEvent } from 'src/features/telemetry'
 import { MobileEventName, ShareableEntity } from 'src/features/telemetry/constants'
+import { PortfolioBalance } from 'uniswap/src/features/dataApi/types'
+import { CurrencyId } from 'uniswap/src/types/currency'
 import { logger } from 'utilities/src/logger/logger'
 import { ONE_SECOND_MS } from 'utilities/src/time/time'
 import { ChainId } from 'wallet/src/constants/chains'
+import { useWalletNavigation } from 'wallet/src/contexts/WalletNavigationContext'
 import { usePortfolioCacheUpdater } from 'wallet/src/features/dataApi/balances'
-import { PortfolioBalance } from 'wallet/src/features/dataApi/types'
 import { toggleTokenVisibility } from 'wallet/src/features/favorites/slice'
 import { pushNotification } from 'wallet/src/features/notifications/slice'
 import { AppNotificationType } from 'wallet/src/features/notifications/types'
-import { useCopyTokenAddressCallback } from 'wallet/src/features/tokens/hooks'
 import { CurrencyField } from 'wallet/src/features/transactions/transactionState/types'
 import { useActiveAccountAddressWithThrow } from 'wallet/src/features/wallet/hooks'
+import { ModalName } from 'wallet/src/telemetry/constants'
 import {
   areCurrencyIdsEqual,
-  CurrencyId,
   currencyIdToAddress,
   currencyIdToChain,
 } from 'wallet/src/utils/currencyId'
@@ -31,6 +33,7 @@ interface TokenMenuParams {
   tokenSymbolForNotification?: Nullable<string>
   portfolioBalance?: Nullable<PortfolioBalance>
 }
+type MenuAction = ContextMenuAction & { onPress: () => void }
 
 // Provide context menu related data for token
 export function useTokenContextMenu({
@@ -38,13 +41,14 @@ export function useTokenContextMenu({
   tokenSymbolForNotification,
   portfolioBalance,
 }: TokenMenuParams): {
-  menuActions: Array<ContextMenuAction & { onPress: () => void }>
+  menuActions: Array<MenuAction>
   onContextMenuPress: (e: NativeSyntheticEvent<ContextMenuOnPressNativeEvent>) => void
 } {
   const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const activeAccountAddress = useActiveAccountAddressWithThrow()
-  const navigateToSwap = useNavigateToSwap()
+
+  const { navigateToSwapFlow } = useWalletNavigation()
   const navigateToSend = useNavigateToSend()
 
   const activeAccountHoldsToken =
@@ -54,20 +58,26 @@ export function useTokenContextMenu({
   const currencyAddress = currencyIdToAddress(currencyId)
   const currencyChainId = currencyIdToChain(currencyId) ?? ChainId.Mainnet
 
-  const onPressCopyContractAddress = useCopyTokenAddressCallback(currencyAddress)
+  const onPressSend = useCallback(() => {
+    // Do not show warning modal speed-bump if user is trying to send tokens they own
+    navigateToSend(currencyAddress, currencyChainId)
+  }, [currencyAddress, currencyChainId, navigateToSend])
+
+  const onPressReceive = useCallback(
+    () =>
+      dispatch(
+        openModal({ name: ModalName.WalletConnectScan, initialState: ScannerModalState.WalletQr })
+      ),
+    [dispatch]
+  )
 
   const onPressSwap = useCallback(
     (currencyField: CurrencyField) => {
-      // Do not show warning modal speedbump if user is trying to swap tokens they own
-      navigateToSwap(currencyField, currencyAddress, currencyChainId)
+      // Do not show warning modal speed-bump if user is trying to swap tokens they own
+      navigateToSwapFlow({ currencyField, currencyAddress, currencyChainId })
     },
-    [currencyAddress, currencyChainId, navigateToSwap]
+    [currencyAddress, currencyChainId, navigateToSwapFlow]
   )
-
-  const onPressSend = useCallback(() => {
-    // Do not show warning modal speedbump if user is trying to send tokens they own
-    navigateToSend(currencyAddress, currencyChainId)
-  }, [currencyAddress, currencyChainId, navigateToSend])
 
   const onPressShare = useCallback(async () => {
     const tokenUrl = getTokenUrl(currencyId)
@@ -98,13 +108,8 @@ export function useTokenContextMenu({
      */
     updateCache(!isHidden, portfolioBalance ?? undefined)
 
-    dispatch(
-      toggleTokenVisibility({
-        accountAddress: activeAccountAddress,
-        currencyId: currencyId.toLowerCase(),
-        currentlyVisible: !isHidden,
-      })
-    )
+    dispatch(toggleTokenVisibility({ currencyId: currencyId.toLowerCase(), isSpam: isHidden }))
+
     if (tokenSymbolForNotification) {
       dispatch(
         pushNotification({
@@ -115,47 +120,34 @@ export function useTokenContextMenu({
         })
       )
     }
-  }, [
-    activeAccountAddress,
-    currencyId,
-    dispatch,
-    isHidden,
-    tokenSymbolForNotification,
-    updateCache,
-    portfolioBalance,
-  ])
+  }, [currencyId, dispatch, isHidden, tokenSymbolForNotification, updateCache, portfolioBalance])
 
   const menuActions = useMemo(
-    () => [
+    (): MenuAction[] => [
       {
-        title: t('Buy'),
-        systemIcon: 'arrow.down',
-        onPress: () => onPressSwap(CurrencyField.OUTPUT),
-      },
-      {
-        title: t('Sell'),
-        systemIcon: 'arrow.up',
+        title: t('common.button.swap'),
+        systemIcon: 'rectangle.2.swap',
         onPress: () => onPressSwap(CurrencyField.INPUT),
       },
       {
-        title: t('Send'),
+        title: t('common.button.send'),
         systemIcon: 'paperplane',
         onPress: onPressSend,
       },
       {
-        title: t('Share'),
-        systemIcon: 'square.and.arrow.up',
-        onPress: onPressShare,
+        title: t('common.button.receive'),
+        systemIcon: 'qrcode',
+        onPress: onPressReceive,
       },
       {
-        title: t('Copy contract address'),
-        systemIcon: 'doc.on.doc',
-        onPress: onPressCopyContractAddress,
+        title: t('common.button.share'),
+        systemIcon: 'square.and.arrow.up',
+        onPress: onPressShare,
       },
       ...(activeAccountHoldsToken
         ? [
             {
-              title: isHidden ? t('Unhide Token') : t('Hide Token'),
+              title: isHidden ? t('tokens.action.unhide') : t('tokens.action.hide'),
               systemIcon: isHidden ? 'eye' : 'eye.slash',
               destructive: !isHidden,
               onPress: onPressHiddenStatus,
@@ -166,7 +158,7 @@ export function useTokenContextMenu({
     [
       t,
       onPressSend,
-      onPressCopyContractAddress,
+      onPressReceive,
       onPressShare,
       activeAccountHoldsToken,
       isHidden,

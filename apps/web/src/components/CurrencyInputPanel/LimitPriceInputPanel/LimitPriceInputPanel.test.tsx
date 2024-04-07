@@ -1,9 +1,10 @@
 import { SwapTab } from 'components/swap/constants'
 import { DAI, USDC_MAINNET } from 'constants/tokens'
 import { LimitContext } from 'state/limit/LimitContext'
-import { SwapAndLimitContext } from 'state/swap/SwapContext'
 import { render, screen } from 'test-utils/render'
 
+import { Expiry } from 'state/limit/types'
+import { SwapAndLimitContext } from 'state/swap/types'
 import { LimitPriceInputPanel } from './LimitPriceInputPanel'
 
 const mockSwapAndLimitContextValue = {
@@ -22,8 +23,10 @@ const mockLimitContextValue = {
     inputAmount: '',
     limitPrice: '100',
     outputAmount: '',
-    expiry: 1,
+    expiry: Expiry.Day,
     isInputAmountFixed: true,
+    limitPriceEdited: false,
+    limitPriceInverted: false,
   },
   setLimitState: jest.fn(),
   derivedLimitInfo: {
@@ -34,10 +37,11 @@ const mockLimitContextValue = {
 
 describe('LimitPriceInputPanel', () => {
   it('should render the component with no currencies selected', () => {
-    const { container } = render(<LimitPriceInputPanel />)
+    const onCurrencySelect = jest.fn()
+    const { container } = render(<LimitPriceInputPanel onCurrencySelect={onCurrencySelect} />)
     expect(screen.getByText('Limit price')).toBeVisible()
     expect(screen.getByPlaceholderText('0')).toBeVisible()
-    expect(screen.getByText('Current')).toBeVisible()
+    expect(screen.getByText('Market')).toBeVisible()
     expect(screen.getByText('+1%')).toBeVisible()
     expect(screen.getByText('+5%')).toBeVisible()
     expect(screen.getByText('+10%')).toBeVisible()
@@ -45,9 +49,10 @@ describe('LimitPriceInputPanel', () => {
   })
 
   it('should render correct subheader with inputCurrency defined, but no price', () => {
+    const onCurrencySelect = jest.fn()
     const { container } = render(
       <SwapAndLimitContext.Provider value={mockSwapAndLimitContextValue}>
-        <LimitPriceInputPanel />
+        <LimitPriceInputPanel onCurrencySelect={onCurrencySelect} />
       </SwapAndLimitContext.Provider>
     )
     expect(screen.getByText('Limit price')).toBeVisible()
@@ -56,10 +61,11 @@ describe('LimitPriceInputPanel', () => {
   })
 
   it('should render correct subheader with input currency and limit price defined', () => {
+    const onCurrencySelect = jest.fn()
     render(
       <SwapAndLimitContext.Provider value={mockSwapAndLimitContextValue}>
         <LimitContext.Provider value={mockLimitContextValue}>
-          <LimitPriceInputPanel />
+          <LimitPriceInputPanel onCurrencySelect={onCurrencySelect} />
         </LimitContext.Provider>
       </SwapAndLimitContext.Provider>
     )
@@ -68,6 +74,7 @@ describe('LimitPriceInputPanel', () => {
   })
 
   it('should render the output currency when defined', () => {
+    const onCurrencySelect = jest.fn()
     const { container } = render(
       <SwapAndLimitContext.Provider
         value={{
@@ -79,7 +86,7 @@ describe('LimitPriceInputPanel', () => {
         }}
       >
         <LimitContext.Provider value={mockLimitContextValue}>
-          <LimitPriceInputPanel />
+          <LimitPriceInputPanel onCurrencySelect={onCurrencySelect} />
         </LimitContext.Provider>
       </SwapAndLimitContext.Provider>
     )

@@ -1,24 +1,26 @@
 import { Currency } from '@uniswap/sdk-core'
 import { hasStringAsync } from 'expo-clipboard'
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Keyboard } from 'react-native'
-import { Flex, useSporeColors } from 'ui/src'
+import { Flex, isWeb, useSporeColors } from 'ui/src'
+import { zIndices } from 'ui/src/theme'
+import { CurrencyInfo } from 'uniswap/src/features/dataApi/types'
 import { Trace } from 'utilities/src/telemetry/trace/Trace'
 import { useDebounce } from 'utilities/src/time/timing'
-import PasteButton from 'wallet/src/components/buttons/PasteButton'
-import { useBottomSheetContext } from 'wallet/src/components/modals/BottomSheetContext'
-import { BottomSheetModal } from 'wallet/src/components/modals/BottomSheetModal'
-import { NetworkFilter } from 'wallet/src/components/network/NetworkFilter'
-import { useFilterCallbacks } from 'wallet/src/components/TokenSelector/hooks'
 import { TokenSelectorEmptySearchList } from 'wallet/src/components/TokenSelector/TokenSelectorEmptySearchList'
 import { TokenSelectorSearchResultsList } from 'wallet/src/components/TokenSelector/TokenSelectorSearchResultsList'
 import { TokenSelectorSendList } from 'wallet/src/components/TokenSelector/TokenSelectorSendList'
 import { TokenSelectorSwapInputList } from 'wallet/src/components/TokenSelector/TokenSelectorSwapInputList'
 import { TokenSelectorSwapOutputList } from 'wallet/src/components/TokenSelector/TokenSelectorSwapOutputList'
+import { useFilterCallbacks } from 'wallet/src/components/TokenSelector/hooks'
 import { SuggestedTokenSection, TokenSection } from 'wallet/src/components/TokenSelector/types'
+import PasteButton from 'wallet/src/components/buttons/PasteButton'
+import { useBottomSheetContext } from 'wallet/src/components/modals/BottomSheetContext'
+import { BottomSheetModal } from 'wallet/src/components/modals/BottomSheetModal'
+import { NetworkFilter } from 'wallet/src/components/network/NetworkFilter'
 import { ChainId } from 'wallet/src/constants/chains'
-import { CurrencyInfo } from 'wallet/src/features/dataApi/types'
+import { useWalletNavigation } from 'wallet/src/contexts/WalletNavigationContext'
 import { SearchContext } from 'wallet/src/features/search/SearchContext'
 import { SearchTextInput } from 'wallet/src/features/search/SearchTextInput'
 import { CurrencyField } from 'wallet/src/features/transactions/transactionState/types'
@@ -37,18 +39,18 @@ export enum TokenSelectorVariation {
   SuggestedAndFavoritesAndPopular = 'suggested-and-favorites-and-popular',
 }
 
-interface TokenSelectorProps {
+export interface TokenSelectorProps {
   currencyField: CurrencyField
   flow: TokenSelectorFlow
   chainId?: ChainId
-  variation: TokenSelectorVariation
+  isSurfaceReady?: boolean
   onClose: () => void
-  onSendEmptyActionPress: () => void
   onSelectCurrency: (
     currency: Currency,
     currencyField: CurrencyField,
     context: SearchContext
   ) => void
+  variation: TokenSelectorVariation
 }
 
 function TokenSelectorContent({
@@ -56,10 +58,11 @@ function TokenSelectorContent({
   flow,
   onSelectCurrency,
   chainId,
-  onSendEmptyActionPress,
+  onClose,
   variation,
+  isSurfaceReady = true,
 }: TokenSelectorProps): JSX.Element {
-  const { isSheetReady } = useBottomSheetContext()
+  const { navigateToBuyOrReceiveWithEmptyWallet } = useWalletNavigation()
 
   const { onChangeChainFilter, onChangeText, searchFilter, chainFilter } = useFilterCallbacks(
     chainId ?? null,
@@ -116,52 +119,98 @@ function TokenSelectorContent({
 
   const [searchInFocus, setSearchInFocus] = useState(false)
 
+  const onSendEmptyActionPress = useCallback(() => {
+    onClose()
+    navigateToBuyOrReceiveWithEmptyWallet()
+  }, [navigateToBuyOrReceiveWithEmptyWallet, onClose])
+
+  function onCancel(): void {
+    setSearchInFocus(false)
+  }
+  function onFocus(): void {
+    if (!isWeb) {
+      setSearchInFocus(true)
+    }
+  }
+
+  const tokenSelector = useMemo(() => {
+    if (searchInFocus && !searchFilter) {
+      return <TokenSelectorEmptySearchList onSelectCurrency={onSelectCurrencyCallback} />
+    }
+
+    if (searchFilter) {
+      return (
+        <TokenSelectorSearchResultsList
+          chainFilter={chainFilter}
+          debouncedSearchFilter={debouncedSearchFilter}
+          isBalancesOnlySearch={variation === TokenSelectorVariation.BalancesOnly}
+          searchFilter={searchFilter}
+          onSelectCurrency={onSelectCurrencyCallback}
+        />
+      )
+    }
+
+    switch (variation) {
+      case TokenSelectorVariation.BalancesOnly:
+        return (
+          <TokenSelectorSendList
+            chainFilter={chainFilter}
+            onEmptyActionPress={onSendEmptyActionPress}
+            onSelectCurrency={onSelectCurrencyCallback}
+          />
+        )
+      case TokenSelectorVariation.BalancesAndPopular:
+        return (
+          <TokenSelectorSwapInputList
+            chainFilter={chainFilter}
+            onSelectCurrency={onSelectCurrencyCallback}
+          />
+        )
+      case TokenSelectorVariation.SuggestedAndFavoritesAndPopular:
+        return (
+          <TokenSelectorSwapOutputList
+            chainFilter={chainFilter}
+            onSelectCurrency={onSelectCurrencyCallback}
+          />
+        )
+    }
+  }, [
+    searchInFocus,
+    searchFilter,
+    variation,
+    onSelectCurrencyCallback,
+    chainFilter,
+    debouncedSearchFilter,
+    onSendEmptyActionPress,
+  ])
+
   return (
     <Trace logImpression element={currencyFieldName} section={SectionName.TokenSelector}>
-      <Flex grow gap="$spacing16" px="$spacing16">
-        <SearchTextInput
-          showCancelButton
-          backgroundColor="$surface2"
-          endAdornment={hasClipboardString ? <PasteButton inline onPress={handlePaste} /> : null}
-          placeholder={t('Search tokens')}
-          py="$spacing8"
-          value={searchFilter ?? ''}
-          onCancel={(): void => setSearchInFocus(false)}
-          onChangeText={onChangeText}
-          onFocus={(): void => setSearchInFocus(true)}
-        />
-
-        {isSheetReady && (
+      <Flex grow gap={isWeb ? '$spacing4' : '$spacing16'} px="$spacing16">
+        <Flex
+          borderBottomColor={isWeb ? '$surface3' : undefined}
+          borderBottomWidth={isWeb ? '$spacing1' : undefined}
+          py="$spacing8">
+          <SearchTextInput
+            autoFocus={isWeb}
+            backgroundColor={isWeb ? '$surface1' : '$surface2'}
+            endAdornment={hasClipboardString ? <PasteButton inline onPress={handlePaste} /> : null}
+            placeholder={t('tokens.selector.search.placeholder')}
+            px={isWeb ? '$none' : '$spacing16'}
+            py="$none"
+            value={searchFilter ?? ''}
+            onCancel={isWeb ? undefined : onCancel}
+            onChangeText={onChangeText}
+            onClose={isWeb ? onClose : undefined}
+            onFocus={isWeb ? undefined : onFocus}
+          />
+        </Flex>
+        {isSurfaceReady && (
           <Flex grow>
-            {searchInFocus && !searchFilter ? (
-              <TokenSelectorEmptySearchList onSelectCurrency={onSelectCurrencyCallback} />
-            ) : searchFilter ? (
-              <TokenSelectorSearchResultsList
-                chainFilter={chainFilter}
-                debouncedSearchFilter={debouncedSearchFilter}
-                isBalancesOnlySearch={variation === TokenSelectorVariation.BalancesOnly}
-                searchFilter={searchFilter}
-                onSelectCurrency={onSelectCurrencyCallback}
-              />
-            ) : variation === TokenSelectorVariation.BalancesOnly ? (
-              <TokenSelectorSendList
-                chainFilter={chainFilter}
-                onEmptyActionPress={onSendEmptyActionPress}
-                onSelectCurrency={onSelectCurrencyCallback}
-              />
-            ) : variation === TokenSelectorVariation.BalancesAndPopular ? (
-              <TokenSelectorSwapInputList
-                chainFilter={chainFilter}
-                onSelectCurrency={onSelectCurrencyCallback}
-              />
-            ) : variation === TokenSelectorVariation.SuggestedAndFavoritesAndPopular ? (
-              <TokenSelectorSwapOutputList
-                chainFilter={chainFilter}
-                onSelectCurrency={onSelectCurrencyCallback}
-              />
-            ) : null}
+            {tokenSelector}
+
             {(!searchInFocus || searchFilter) && (
-              <Flex position="absolute" right={0}>
+              <Flex position="absolute" right={0} zIndex={zIndices.fixed}>
                 <NetworkFilter
                   includeAllNetworks
                   selectedChain={chainFilter}
@@ -174,6 +223,12 @@ function TokenSelectorContent({
       </Flex>
     </Trace>
   )
+}
+
+function TokenSelectorModalContent(props: TokenSelectorProps): JSX.Element {
+  const { isSheetReady } = useBottomSheetContext()
+
+  return <TokenSelectorContent {...props} isSurfaceReady={isSheetReady} />
 }
 
 function _TokenSelectorModal(props: TokenSelectorProps): JSX.Element {
@@ -195,9 +250,17 @@ function _TokenSelectorModal(props: TokenSelectorProps): JSX.Element {
       name={ModalName.TokenSelector}
       snapPoints={['65%', '100%']}
       onClose={props.onClose}>
-      <TokenSelectorContent {...props} />
+      <TokenSelectorModalContent {...props} />
     </BottomSheetModal>
   )
 }
 
 export const TokenSelectorModal = memo(_TokenSelectorModal)
+
+export function TokenSelector(props: TokenSelectorProps): JSX.Element {
+  return (
+    <Flex shrink backgroundColor="$surface1" height="100%" pt="$spacing8">
+      <TokenSelectorContent {...props} />
+    </Flex>
+  )
+}

@@ -1,12 +1,15 @@
-import { Expiry, LimitContext } from 'state/limit/LimitContext'
+import { LimitContext } from 'state/limit/LimitContext'
 import { render } from 'test-utils/render'
 
+import { Expiry } from 'state/limit/types'
 import { LimitExpirySection } from './LimitExpirySection'
 
 const mockLimitContextValue = {
   limitState: {
     inputAmount: '',
     limitPrice: '100',
+    limitPriceEdited: false,
+    limitPriceInverted: false,
     outputAmount: '',
     expiry: Expiry.Day,
     isInputAmountFixed: true,
@@ -26,10 +29,10 @@ describe('LimitExpirySection', () => {
       </LimitContext.Provider>
     )
     expect(result.getByText('Expiry')).toBeInTheDocument()
-    expect(result.getByText('1 Day')).toBeInTheDocument()
-    expect(result.getByText('1 Week')).toBeInTheDocument()
-    expect(result.getByText('1 Month')).toBeInTheDocument()
-    expect(result.getByText('1 Year')).toBeInTheDocument()
+    expect(result.getByText('1 day')).toBeInTheDocument()
+    expect(result.getByText('1 week')).toBeInTheDocument()
+    expect(result.getByText('1 month')).toBeInTheDocument()
+    expect(result.getByText('1 year')).toBeInTheDocument()
   })
 
   it('should call the callback when clicking unselected option', () => {
@@ -39,7 +42,7 @@ describe('LimitExpirySection', () => {
         <LimitExpirySection />
       </LimitContext.Provider>
     )
-    result.getByText('1 Month').click()
+    result.getByText('1 month').click()
     expect(callback).toHaveBeenCalled()
   })
 
@@ -50,7 +53,7 @@ describe('LimitExpirySection', () => {
         <LimitExpirySection />
       </LimitContext.Provider>
     )
-    result.getByText('1 Day').click()
+    result.getByText('1 day').click()
     expect(callback).not.toHaveBeenCalled()
   })
 })

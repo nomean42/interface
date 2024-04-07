@@ -45,9 +45,27 @@ export const slice = createSlice({
       state.walletIsFunded = true
     },
     setAllowAnalytics: (state, { payload: { enabled } }: PayloadAction<{ enabled: boolean }>) => {
-      sendWalletAnalyticsEvent(SharedEventName.ANALYTICS_SWITCH_TOGGLED, { enabled })
-      analytics.flushEvents()
-      analytics.setAllowAnalytics(enabled).finally(() => undefined)
+      const logToggleEvent = (): void => {
+        sendWalletAnalyticsEvent(SharedEventName.ANALYTICS_SWITCH_TOGGLED, { enabled })
+        analytics.flushEvents()
+      }
+
+      // If turning off, log toggle event before turning off analytics
+      if (!enabled) {
+        logToggleEvent()
+      }
+
+      analytics
+        .setAllowAnalytics(enabled)
+        .then(() => {
+          // If turned on, log toggle event after turning on analytics
+          if (enabled) {
+            logToggleEvent()
+          }
+        })
+        .catch(() => undefined)
+
+      // Set enabled in user state
       state.allowAnalytics = enabled
     },
   },

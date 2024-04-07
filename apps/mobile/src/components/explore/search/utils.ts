@@ -1,13 +1,16 @@
-import { Chain, ExploreSearchQuery } from 'wallet/src/data/__generated__/types-and-hooks'
+import { SEARCH_RESULT_HEADER_KEY } from 'src/components/explore/search/constants'
+import { SearchResultOrHeader } from 'src/components/explore/search/types'
+import {
+  Chain,
+  ExploreSearchQuery,
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import { fromGraphQLChain } from 'wallet/src/features/chains/utils'
-import { searchResultId } from 'wallet/src/features/search/searchHistorySlice'
 import {
   NFTCollectionSearchResult,
   SearchResultType,
   TokenSearchResult,
 } from 'wallet/src/features/search/SearchResult'
-import { SEARCH_RESULT_HEADER_KEY } from './constants'
-import { SearchResultOrHeader } from './types'
+import { searchResultId } from 'wallet/src/features/search/searchHistorySlice'
 
 const MAX_TOKEN_RESULTS_COUNT = 4
 
@@ -109,7 +112,7 @@ export const gqlNFTToNFTCollectionSearchResult = (
 ): NFTCollectionSearchResult | null => {
   const contract = node?.nftContracts?.[0]
   // Only show NFT results that have fully populated results
-  const chainId = fromGraphQLChain(node?.nftContracts?.[0]?.chain ?? Chain.Ethereum)
+  const chainId = fromGraphQLChain(contract?.chain ?? Chain.Ethereum)
   if (node.name && contract?.address && chainId) {
     return {
       type: SearchResultType.NFTCollection,

@@ -1,75 +1,169 @@
 import { t } from 'i18next'
+import { useEffect, useMemo, useState } from 'react'
+import { ColorTokens } from 'ui/src'
+import { useDebounce } from 'utilities/src/time/timing'
 import zxcvbn from 'zxcvbn'
 
-export interface PasswordValidationResult {
-  score: number
-  suggestions?: string[]
-  valid: boolean
-  validationErrorString?: string
+export enum PasswordErrors {
+  WeakPassword = 'WeakPassword',
+  PasswordsDoNotMatch = 'PasswordsDoNotMatch',
 }
 
-// These strings are enumerated like this so we can explicitly translate each english warning from zxcvbn.
-function translateWarning(warning: string): string {
-  if (warning === 'Straight rows of keys are easy to guess') {
-    return t('Straight rows of keys are easy to guess')
-  }
-  if (warning === 'Short keyboard patterns are easy to guess') {
-    return t('Short keyboard patterns are easy to guess')
-  }
-  if (warning === 'Use a longer keyboard pattern with more turns') {
-    return t('Use a longer keyboard pattern with more turns')
-  }
-  if (warning === 'Repeats like "aaa" are easy to guess') {
-    return t('Repeats like "aaa" are easy to guess')
-  }
-  if (warning === 'Repeats like "abcabcabc" are only slightly harder to guess than "abc"') {
-    return t('Repeats like "abcabcabc" are only slightly harder to guess than "abc"')
-  }
-  if (warning === 'Sequences like abc or 6543 are easy to guess') {
-    return t('Sequences like abc or 6543 are easy to guess')
-  }
-  if (warning === 'Recent years are easy to guess') {
-    return t('Recent years are easy to guess')
-  }
-  if (warning === 'Dates are often easy to guess') {
-    return t('Dates are often easy to guess')
-  }
-  if (warning === 'This is a top-10 common password') {
-    return t('This is a top-10 common password')
-  }
-  if (warning === 'This is a top-100 common password') {
-    return t('This is a top-100 common password')
-  }
-  if (warning === 'This is a very common password') {
-    return t('This is a very common password')
-  }
-  if (warning === 'This is similar to a commonly used password') {
-    return t('This is similar to a commonly used password')
-  }
-  if (warning === 'A word by itself is easy to guess') {
-    return t('A word by itself is easy to guess')
-  }
-  if (warning === 'Names and surnames by themselves are easy to guess') {
-    return t('Names and surnames by themselves are easy to guess')
-  }
-  if (warning === 'Common names and surnames are easy to guess') {
-    return t('Common names and surnames are easy to guess')
-  }
-  return warning
+export enum PasswordStrength {
+  NONE, // if there is no input or we don't want it to be displayed yet
+  WEAK,
+  MEDIUM,
+  STRONG,
 }
 
-export const REQUIRED_PASSWORD_STRENGTH_SCORE = 3
+export const PASSWORD_VALIDATION_DEBOUNCE_MS = 750
 
-export function validatePassword(password: string): PasswordValidationResult {
-  const { score, feedback } = zxcvbn(password)
-  if (score >= REQUIRED_PASSWORD_STRENGTH_SCORE) {
-    return { score, suggestions: feedback.suggestions, valid: true }
+export function isPasswordStrongEnough({
+  minStrength,
+  currentStrength,
+}: {
+  minStrength: PasswordStrength
+  currentStrength: PasswordStrength
+}): boolean {
+  return currentStrength >= minStrength
+}
+
+export function getPasswordStrength(password: string): PasswordStrength {
+  const { score } = zxcvbn(password)
+
+  if (!password) {
+    return PasswordStrength.NONE
   }
-  const warning = translateWarning(feedback.warning)
+
+  if (score < 2) {
+    return PasswordStrength.WEAK
+  } else if (score < 4) {
+    return PasswordStrength.MEDIUM
+  } else {
+    return PasswordStrength.STRONG
+  }
+}
+
+export function getPasswordStrengthTextAndColor(strength: PasswordStrength): {
+  text: string
+  color: ColorTokens
+} {
+  switch (strength) {
+    case PasswordStrength.WEAK:
+      return { text: t('common.input.password.strength.weak'), color: '$statusCritical' }
+    case PasswordStrength.MEDIUM:
+      return {
+        text: t('common.input.password.strength.medium'),
+        color: '$DEP_accentWarning',
+      }
+    case PasswordStrength.STRONG:
+      return { text: t('common.input.password.strength.strong'), color: '$statusSuccess' }
+    default:
+      return { text: '', color: '$neutral1' }
+  }
+}
+
+function doPasswordsDiffer(password: string, confirmPassword: string): boolean {
+  return Boolean(password && confirmPassword) && password !== confirmPassword
+}
+
+export function usePasswordForm(): {
+  password: string
+  confirmPassword: string
+  hideInput: boolean
+  enableNext: boolean
+  debouncedPasswordStrength: PasswordStrength
+  errorText: string
+  onChangePassword: (text: string) => void
+  onChangeConfirmPassword: (text: string) => void
+  setHideInput: (value: boolean) => void
+  checkSubmit: () => boolean
+  onPasswordBlur: () => void
+} {
+  const [lostPasswordFocus, setLostPasswordFocused] = useState(false)
+  const onPasswordBlur = (): void => setLostPasswordFocused(true)
+
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [hideInput, setHideInput] = useState(true)
+  const [error, setError] = useState<PasswordErrors | undefined>(undefined)
+
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password])
+  const debouncedPasswordStrength = useDebounce(passwordStrength, PASSWORD_VALIDATION_DEBOUNCE_MS)
+
+  const isWeakPassword = useMemo(
+    () =>
+      password &&
+      !isPasswordStrongEnough({
+        currentStrength: passwordStrength,
+        minStrength: PasswordStrength.MEDIUM,
+      }),
+    [passwordStrength, password]
+  )
+
+  const debouncedPassword = useDebounce(password, PASSWORD_VALIDATION_DEBOUNCE_MS * 2)
+  const debouncedConfirmPassword = useDebounce(confirmPassword, PASSWORD_VALIDATION_DEBOUNCE_MS * 2)
+
+  const debouncedPasswordsDiffer = useMemo(
+    () => doPasswordsDiffer(debouncedPassword, debouncedConfirmPassword),
+    [debouncedPassword, debouncedConfirmPassword]
+  )
+
+  const enableNext = Boolean(password && confirmPassword) && !isWeakPassword
+
+  const onChangePassword = (text: string): void => {
+    setPassword(text)
+  }
+
+  const onChangeConfirmPassword = (text: string): void => {
+    // if the user corrects the mismatched passwords then clear the error rigtht away without waiting for the debounce.
+    if ((!text || text === password) && error === PasswordErrors.PasswordsDoNotMatch) {
+      setError(undefined)
+    }
+    setConfirmPassword(text)
+  }
+
+  useEffect(() => {
+    if (isWeakPassword && lostPasswordFocus) {
+      setError(PasswordErrors.WeakPassword)
+    } else if (debouncedPasswordsDiffer) {
+      setError(PasswordErrors.PasswordsDoNotMatch)
+    } else {
+      setError(undefined)
+    }
+  }, [debouncedPasswordsDiffer, isWeakPassword, lostPasswordFocus])
+
+  const errorText: string = useMemo(() => {
+    if (error === PasswordErrors.WeakPassword) {
+      return t('common.input.password.error.weak')
+    }
+    if (error === PasswordErrors.PasswordsDoNotMatch) {
+      return t('common.input.password.error.mismatch')
+    }
+    return ''
+  }, [error])
+
+  const checkSubmit = (): boolean => {
+    const isValid = !isWeakPassword && !doPasswordsDiffer(password, confirmPassword)
+
+    if (!isValid) {
+      setError(isWeakPassword ? PasswordErrors.WeakPassword : PasswordErrors.PasswordsDoNotMatch)
+    }
+
+    return isValid
+  }
+
   return {
-    score,
-    suggestions: feedback.suggestions,
-    valid: false,
-    validationErrorString: warning || feedback.warning,
+    password,
+    confirmPassword,
+    hideInput,
+    enableNext,
+    debouncedPasswordStrength,
+    errorText,
+    onChangePassword,
+    onChangeConfirmPassword,
+    setHideInput,
+    checkSubmit,
+    onPasswordBlur,
   }
 }

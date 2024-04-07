@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react'
 import { RecipientData, SendInfo, useDerivedSendInfo } from 'state/send/hooks'
-import { useSwapAndLimitContext } from 'state/swap/SwapContext'
+import { useSwapAndLimitContext } from 'state/swap/hooks'
 
 export type SendState =
   | {
@@ -33,7 +33,7 @@ export type SendState =
         }
     )
 
-type SendContextType = {
+export type SendContextType = {
   sendState: SendState
   derivedSendInfo: SendInfo
   setSendState: Dispatch<SetStateAction<SendState>>
@@ -48,7 +48,8 @@ const DEFAULT_SEND_STATE: SendState = {
   validatedRecipientData: undefined,
 }
 
-const SendContext = createContext<SendContextType>({
+// exported for testing
+export const SendContext = createContext<SendContextType>({
   sendState: DEFAULT_SEND_STATE,
   setSendState: () => undefined,
   derivedSendInfo: {

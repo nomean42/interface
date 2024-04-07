@@ -1,9 +1,9 @@
 import { ApolloClient, InMemoryCache } from '@apollo/client'
-const GRAPHQL_ENDPOINT = 'https://api.uniswap.org/v1/graphql'
+const GRAPHQL_ENDPOINT = 'https://interface.gateway.uniswap.org/v1/graphql'
 
 //TODO: Figure out how to make ApolloClient global variable
 export default new ApolloClient({
-  connectToDevTools: true,
+  connectToDevTools: false,
   uri: GRAPHQL_ENDPOINT,
   headers: {
     'Content-Type': 'application/json',

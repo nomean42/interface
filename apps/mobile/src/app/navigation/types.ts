@@ -8,6 +8,7 @@ import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-naviga
 import { EducationContentType } from 'src/components/education'
 import { HomeScreenTabIndex } from 'src/screens/HomeScreenTabIndex'
 import { FiatOnRampScreens, OnboardingScreens, Screens, UnitagScreens } from 'src/screens/Screens'
+import { UnitagClaim } from 'uniswap/src/features/unitags/types'
 import { NFTItem } from 'wallet/src/features/nfts/types'
 import { ImportType, OnboardingEntryPoint } from 'wallet/src/features/onboarding/types'
 
@@ -39,6 +40,7 @@ export type ExploreStackParamList = {
 export type FiatOnRampStackParamList = {
   [FiatOnRampScreens.AmountInput]: undefined
   [FiatOnRampScreens.ServiceProviders]: undefined
+  [FiatOnRampScreens.Connecting]: undefined
 }
 
 export type SettingsStackParamList = {
@@ -63,6 +65,22 @@ export type SettingsStackParamList = {
 export type OnboardingStackBaseParams = {
   importType: ImportType
   entryPoint: OnboardingEntryPoint
+  unitagClaim?: UnitagClaim
+}
+
+export type UnitagEntryPoint = OnboardingScreens.Landing | Screens.Home | Screens.Settings
+
+export type SharedUnitagScreenParams = {
+  [UnitagScreens.ClaimUnitag]: {
+    entryPoint: UnitagEntryPoint
+    address?: Address
+  }
+  [UnitagScreens.ChooseProfilePicture]: {
+    entryPoint: UnitagEntryPoint
+    unitag: string
+    unitagFontSize: number
+    address: Address
+  }
 }
 
 export type OnboardingStackParamList = {
@@ -76,15 +94,8 @@ export type OnboardingStackParamList = {
   [OnboardingScreens.Landing]: OnboardingStackBaseParams
   [OnboardingScreens.EditName]: OnboardingStackBaseParams
   [OnboardingScreens.Notifications]: OnboardingStackBaseParams
-  [OnboardingScreens.QRAnimation]: OnboardingStackBaseParams
+  [OnboardingScreens.WelcomeWallet]: OnboardingStackBaseParams
   [OnboardingScreens.Security]: OnboardingStackBaseParams
-
-  // unitag
-  [UnitagScreens.ClaimUnitag]: { entryPoint: OnboardingScreens.Landing | Screens.Home }
-  [UnitagScreens.ChooseProfilePicture]: {
-    entryPoint: OnboardingScreens.Landing | Screens.Home
-    unitag: string
-  }
 
   // import
   [OnboardingScreens.ImportMethod]: OnboardingStackBaseParams
@@ -96,14 +107,9 @@ export type OnboardingStackParamList = {
   [OnboardingScreens.SeedPhraseInput]: OnboardingStackBaseParams
   [OnboardingScreens.SelectWallet]: OnboardingStackBaseParams
   [OnboardingScreens.WatchWallet]: OnboardingStackBaseParams
-}
+} & SharedUnitagScreenParams
 
-export type UnitagStackParamList = {
-  [UnitagScreens.ClaimUnitag]: { entryPoint: OnboardingScreens.Landing | Screens.Home }
-  [UnitagScreens.ChooseProfilePicture]: {
-    entryPoint: OnboardingScreens.Landing | Screens.Home
-    unitag: string
-  }
+export type UnitagStackParamList = SharedUnitagScreenParams & {
   [UnitagScreens.UnitagConfirmation]: {
     unitag: string
     address: Address

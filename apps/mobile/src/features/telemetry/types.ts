@@ -4,7 +4,6 @@ import { MobileEventName, ShareableEntity } from 'src/features/telemetry/constan
 import { WidgetEvent, WidgetType } from 'src/features/widgets/widgets'
 import { TraceProps } from 'utilities/src/telemetry/trace/Trace'
 import { ImportType } from 'wallet/src/features/onboarding/types'
-import { CurrencyField } from 'wallet/src/features/transactions/transactionState/types'
 import { EthMethod, WCEventType, WCRequestOutcome } from 'wallet/src/features/walletConnect/types'
 
 // Events related to Moonpay internal transactions
@@ -16,6 +15,7 @@ export type MoonpayTransactionEventProperties = TraceProps &
 
 export type AssetDetailsBaseProperties = {
   name?: string
+  domain?: string
   address: string
   chain?: number
 }
@@ -65,9 +65,10 @@ export type MobileEventProperties = {
     type: 'token' | 'wallet'
   }
   [MobileEventName.FiatOnRampQuickActionButtonPressed]: TraceProps
-  [MobileEventName.FiatOnRampBannerPressed]: TraceProps
-  [MobileEventName.FiatOnRampAmountEntered]: TraceProps & { source: 'chip' | 'textInput' }
   [MobileEventName.FiatOnRampWidgetOpened]: TraceProps & { externalTransactionId: string }
+  [MobileEventName.NotificationsToggled]: TraceProps & {
+    enabled: boolean
+  }
   [MobileEventName.OnboardingCompleted]: OnboardingCompletedProps & TraceProps
   [MobileEventName.PerformanceReport]: RenderPassReport
   [MobileEventName.PerformanceGraphql]: {
@@ -85,11 +86,6 @@ export type MobileEventProperties = {
     url: string
   }
   [MobileEventName.TokenDetailsOtherChainButtonPressed]: TraceProps
-  [MobileEventName.TokenSelected]: TraceProps &
-    AssetDetailsBaseProperties &
-    SearchResultContextProperties & {
-      field: CurrencyField
-    }
   [MobileEventName.WalletAdded]: OnboardingCompletedProps & TraceProps
   [MobileEventName.WalletConnectSheetCompleted]: {
     request_type: WCEventType

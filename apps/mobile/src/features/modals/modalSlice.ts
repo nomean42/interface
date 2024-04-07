@@ -2,7 +2,10 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { ExploreModalState } from 'src/app/modals/ExploreModalState'
 import { ScannerModalState } from 'src/components/QRCodeScanner/constants'
 import { RemoveWalletModalState } from 'src/components/RemoveWallet/RemoveWalletModalState'
+import { ExchangeTransferModalState } from 'src/features/fiatOnRamp/ExchangeTransferModalState'
+import { ExtensionWaitlistModalState } from 'src/features/scantastic/ExtensionWaitlistModalState'
 import { ScantasticModalState } from 'src/features/scantastic/ScantasticModalState'
+import { Screens } from 'src/screens/Screens'
 import { getKeys } from 'utilities/src/primitives/objects'
 import { TransactionState } from 'wallet/src/features/transactions/transactionState/types'
 import { ModalName } from 'wallet/src/telemetry/constants'
@@ -13,11 +16,21 @@ type AccountSwitcherModalParams = {
   initialState?: undefined
 }
 
+type ExchangeTransferModalParams = {
+  name: typeof ModalName.ExchangeTransferModal
+  initialState?: ExchangeTransferModalState
+}
+
 type ExperimentsModalParams = { name: typeof ModalName.Experiments; initialState?: undefined }
 
 type ExploreModalParams = {
   name: typeof ModalName.Explore
   initialState?: ExploreModalState
+}
+
+type ExtensionWaitlistModalParams = {
+  name: typeof ModalName.ExtensionWaitlistModal
+  initialState: ExtensionWaitlistModalState
 }
 
 type FiatCurrencySelectorParams = {
@@ -29,6 +42,11 @@ type FiatOnRampModalParams = { name: typeof ModalName.FiatOnRamp; initialState?:
 
 type FiatOnRampAggregatorModalParams = {
   name: typeof ModalName.FiatOnRampAggregator
+  initialState?: undefined
+}
+
+type ReceiveCryptoModalParams = {
+  name: typeof ModalName.ReceiveCryptoModal
   initialState?: undefined
 }
 
@@ -58,7 +76,10 @@ type SwapModalParams = { name: typeof ModalName.Swap; initialState?: Transaction
 
 type SendModalParams = { name: typeof ModalName.Send; initialState?: TransactionState }
 
-type UnitagsIntroParams = { name: typeof ModalName.UnitagsIntro; initialState?: undefined }
+type UnitagsIntroParams = {
+  name: typeof ModalName.UnitagsIntro
+  initialState?: { address: Address; entryPoint: Screens.Home | Screens.Settings }
+}
 
 type ViewOnlyExplainerParams = {
   name: typeof ModalName.ViewOnlyExplainer
@@ -67,11 +88,14 @@ type ViewOnlyExplainerParams = {
 
 export type OpenModalParams =
   | AccountSwitcherModalParams
+  | ExchangeTransferModalParams
   | ExperimentsModalParams
   | ExploreModalParams
+  | ExtensionWaitlistModalParams
   | FiatCurrencySelectorParams
   | FiatOnRampModalParams
   | FiatOnRampAggregatorModalParams
+  | ReceiveCryptoModalParams
   | LanguageSelectorModalParams
   | ScantasticModalParams
   | RemoveWalletModalParams
@@ -84,7 +108,11 @@ export type OpenModalParams =
 
 export type CloseModalParams = { name: keyof ModalsState }
 
-export const initialModalState: ModalsState = {
+export const initialModalsState: ModalsState = {
+  [ModalName.ExchangeTransferModal]: {
+    isOpen: false,
+    initialState: undefined,
+  },
   [ModalName.FiatOnRamp]: {
     isOpen: false,
     initialState: undefined,
@@ -93,11 +121,19 @@ export const initialModalState: ModalsState = {
     isOpen: false,
     initialState: undefined,
   },
+  [ModalName.ReceiveCryptoModal]: {
+    isOpen: false,
+    initialState: undefined,
+  },
   [ModalName.WalletConnectScan]: {
     isOpen: false,
     initialState: ScannerModalState.ScanQr,
   },
   [ModalName.Scantastic]: {
+    isOpen: false,
+    initialState: undefined,
+  },
+  [ModalName.ExtensionWaitlistModal]: {
     isOpen: false,
     initialState: undefined,
   },
@@ -149,7 +185,7 @@ export const initialModalState: ModalsState = {
 
 const slice = createSlice({
   name: 'modals',
-  initialState: initialModalState,
+  initialState: initialModalsState,
   reducers: {
     openModal: (state, action: PayloadAction<OpenModalParams>) => {
       const { name, initialState } = action.payload

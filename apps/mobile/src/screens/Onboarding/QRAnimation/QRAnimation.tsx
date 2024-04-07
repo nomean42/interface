@@ -22,10 +22,10 @@ import {
   withDelay,
   withTiming,
 } from 'react-native-reanimated'
-import { GradientBackground } from 'src/components/gradients/GradientBackground'
-import { UniconThemedGradient } from 'src/components/gradients/UniconThemedGradient'
 import { QRCodeDisplay } from 'src/components/QRCodeScanner/QRCode'
 import Trace from 'src/components/Trace/Trace'
+import { GradientBackground } from 'src/components/gradients/GradientBackground'
+import { UniconThemedGradient } from 'src/components/gradients/UniconThemedGradient'
 import {
   flashWipeAnimation,
   letsGoButtonFadeIn,
@@ -42,6 +42,7 @@ import {
   Button,
   Flex,
   Text,
+  getUniconV2Colors,
   useIsDarkMode,
   useMedia,
   useSporeColors,
@@ -50,7 +51,9 @@ import {
 import { ONBOARDING_QR_ETCHING_VIDEO_DARK, ONBOARDING_QR_ETCHING_VIDEO_LIGHT } from 'ui/src/assets'
 import LockIcon from 'ui/src/assets/icons/lock.svg'
 import { AnimatedFlex, flexStyles } from 'ui/src/components/layout'
-import { fonts, iconSizes, opacify } from 'ui/src/theme'
+import { fonts, iconSizes, opacify, spacing } from 'ui/src/theme'
+import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
+import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
 import { AddressDisplay } from 'wallet/src/components/accounts/AddressDisplay'
 import { Arrow } from 'wallet/src/components/icons/Arrow'
 import { ElementName } from 'wallet/src/telemetry/constants'
@@ -161,13 +164,18 @@ export function QRAnimation({
     opacity: isPlayingVideo.value ? 1 : 0,
   }))
 
-  const uniconColors = useUniconColors(activeAddress)
-
   // used throughout the page the get the size of the QR code container
   // setting as a constant so that it doesn't get defined by padding and screen size and give us less design control
-  const QR_CONTAINER_SIZE = media.short ? 160 : 242
+  const QR_CONTAINER_SIZE = media.short ? 175 : 242
   const QR_CODE_SIZE = media.short ? 140 : 190
   const UNICON_SIZE = 64
+
+  const uniconV1Colors = useUniconColors(activeAddress)
+  const { color: uniconV2Color } = getUniconV2Colors(activeAddress)
+  const isUniconsV2Enabled = useFeatureFlag(FeatureFlags.UniconsV2)
+  const uniconColors = isUniconsV2Enabled
+    ? { gradientStart: uniconV2Color, gradientEnd: uniconV2Color, glow: uniconV2Color }
+    : uniconV1Colors
 
   return (
     <>
@@ -185,7 +193,7 @@ export function QRAnimation({
         <Flex centered grow gap="$spacing36" mb="$spacing12" mt="$spacing12">
           <Flex centered gap="$spacing12" pt="$spacing48">
             <AnimatedFlex entering={qrSlideUpAndFadeIn}>
-              <AnimatedFlex entering={qrSlideUpAtEnd}>
+              <AnimatedFlex centered entering={qrSlideUpAtEnd}>
                 <AnimatedFlex entering={flashWipeAnimation} style={styles.behindQrBlur}>
                   <Canvas style={flexStyles.fill}>
                     <Group transform={[{ translateX: 50 }, { translateY: 50 }]}>
@@ -204,7 +212,7 @@ export function QRAnimation({
                 </AnimatedFlex>
                 <AnimatedFlex entering={qrScaleIn}>
                   <Flex
-                    bg="$surface1"
+                    backgroundColor="$surface1"
                     borderColor="$surface3"
                     borderRadius="$rounded20"
                     borderWidth={2}
@@ -216,9 +224,9 @@ export function QRAnimation({
                         hideOutline
                         address={activeAddress}
                         backgroundColor="$surface1"
+                        color={isUniconsV2Enabled ? uniconV2Color : undefined}
                         containerBackgroundColor="$surface1"
                         logoSize={UNICON_SIZE}
-                        overlayOpacityPercent={10}
                         safeAreaColor="$surface1"
                         size={QR_CODE_SIZE}
                       />
@@ -244,7 +252,7 @@ export function QRAnimation({
                           { translateY: QR_CONTAINER_SIZE / 2 - 40 },
                         ]}>
                         <Oval
-                          color={uniconColors.gradientStart}
+                          color={uniconColors.glow}
                           height={80}
                           opacity={preglowBlurOpacity}
                           width={80}
@@ -257,46 +265,47 @@ export function QRAnimation({
                     <Flex
                       borderRadius="$rounded20"
                       height="100%"
-                      style={{ backgroundColor: uniconColors.glow }}
+                      style={{
+                        backgroundColor: uniconColors.glow,
+                      }}
                       width="100%"
                     />
                   </AnimatedFlex>
                 </AnimatedFlex>
-                <AnimatedFlex entering={textSlideUpAtEnd}>
-                  <Flex centered mt="$spacing24">
-                    <AddressDisplay
-                      showCopy
-                      address={activeAddress}
-                      captionTextColor="$neutral3"
-                      captionVariant="subheading2"
-                      showAccountIcon={false}
-                      variant="heading3"
-                    />
-                  </Flex>
-                </AnimatedFlex>
               </AnimatedFlex>
             </AnimatedFlex>
+            {/* negative top margin required because the glow around the QR code is absolute with -50 margin */}
+            <AnimatedFlex entering={textSlideUpAtEnd} style={{ marginTop: -spacing.spacing48 }}>
+              <Flex centered mt={-spacing.spacing4}>
+                <AddressDisplay
+                  showCopy
+                  address={activeAddress}
+                  captionTextColor="$neutral3"
+                  captionVariant="subheading2"
+                  showAccountIcon={false}
+                  variant="heading3"
+                />
+              </Flex>
+            </AnimatedFlex>
           </Flex>
-          <AnimatedFlex entering={textSlideUpAtEnd} style={[styles.textContainer]}>
+          <AnimatedFlex entering={textSlideUpAtEnd} pt="$spacing4" style={[styles.textContainer]}>
             <Text
-              $short={{ variant: 'subheading2', maxFontSizeMultiplier: 1.1 }}
-              maxFontSizeMultiplier={fonts.heading3.maxFontSizeMultiplier}
+              $short={{ variant: 'subheading2' }}
+              maxFontSizeMultiplier={media.short ? 1.1 : fonts.heading3.maxFontSizeMultiplier}
               pb="$spacing12"
               textAlign="center"
               variant="subheading1">
-              {t('Welcome to your new wallet')}
+              {t('onboarding.wallet.title')}
             </Text>
             <Text
-              $short={{ variant: 'body3', maxFontSizeMultiplier: 1.1 }}
+              $short={{ variant: 'body3' }}
               color="$neutral2"
-              maxFontSizeMultiplier={fonts.body1.maxFontSizeMultiplier}
+              maxFontSizeMultiplier={media.short ? 1.1 : fonts.body1.maxFontSizeMultiplier}
               textAlign="center"
               variant="body2">
               {isNewWallet
-                ? t('Your personal space for tokens, NFTs, and all your trades.')
-                : t(
-                    'Check out your tokens and NFTs, follow crypto wallets, and stay up to date on the go.'
-                  )}
+                ? t('onboarding.wallet.description.new')
+                : t('onboarding.wallet.description.existing')}
             </Text>
           </AnimatedFlex>
         </Flex>
@@ -317,12 +326,13 @@ export function QRAnimation({
                       />
                     </Flex>
                     <Text color="$sporeWhite" variant="buttonLabel2">
-                      {t('Let’s keep it safe')}
+                      {t('onboarding.wallet.continue')}
                     </Text>
                   </Flex>
                   <Arrow color={colors.sporeWhite.val} direction="e" size={iconSizes.icon24} />
                 </Flex>
               }
+              testID={ElementName.Next}
               onPress={onPressNext}
             />
           </Trace>
@@ -360,6 +370,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     justifyContent: 'center',
     marginHorizontal: 28,
+    marginTop: spacing.spacing60,
   },
   video: {
     bottom: 4,

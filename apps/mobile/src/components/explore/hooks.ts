@@ -1,25 +1,33 @@
 import { SharedEventName } from '@uniswap/analytics-events'
 import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { NativeSyntheticEvent, Share } from 'react-native'
+import { NativeSyntheticEvent, Share, ViewStyle } from 'react-native'
 import { ContextMenuAction, ContextMenuOnPressNativeEvent } from 'react-native-context-menu-view'
+import {
+  AnimateStyle,
+  SharedValue,
+  interpolate,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated'
+import { ScannerModalState } from 'src/components/QRCodeScanner/constants'
 import { useSelectHasTokenFavorited, useToggleFavoriteCallback } from 'src/features/favorites/hooks'
 import { openModal } from 'src/features/modals/modalSlice'
 import { sendMobileAnalyticsEvent } from 'src/features/telemetry'
 import { MobileEventName, ShareableEntity } from 'src/features/telemetry/constants'
+import { CurrencyId } from 'uniswap/src/types/currency'
 import { logger } from 'utilities/src/logger/logger'
 import { ChainId } from 'wallet/src/constants/chains'
 import { AssetType } from 'wallet/src/entities/assets'
-import { useCopyTokenAddressCallback } from 'wallet/src/features/tokens/hooks'
 import {
   CurrencyField,
   TransactionState,
 } from 'wallet/src/features/transactions/transactionState/types'
 import { useAppDispatch } from 'wallet/src/state'
 import { ElementName, ModalName, SectionNameType } from 'wallet/src/telemetry/constants'
+import { currencyIdToAddress } from 'wallet/src/utils/currencyId'
 import { getTokenUrl } from 'wallet/src/utils/linking'
-
-import { CurrencyId, currencyIdToAddress } from 'wallet/src/utils/currencyId'
 
 interface TokenMenuParams {
   currencyId: CurrencyId
@@ -47,7 +55,13 @@ export function useExploreTokenContextMenu({
   // currencyId, where we have hardcoded addresses for native currencies
   const currencyAddress = currencyIdToAddress(currencyId)
 
-  const onPressCopyContractAddress = useCopyTokenAddressCallback(currencyAddress)
+  const onPressReceive = useCallback(
+    () =>
+      dispatch(
+        openModal({ name: ModalName.WalletConnectScan, initialState: ScannerModalState.WalletQr })
+      ),
+    [dispatch]
+  )
 
   const onPressShare = useCallback(async () => {
     const tokenUrl = getTokenUrl(currencyId)
@@ -94,29 +108,31 @@ export function useExploreTokenContextMenu({
   const menuActions = useMemo(
     () => [
       {
-        title: isFavorited ? t('Remove favorite') : t('Favorite token'),
+        title: isFavorited
+          ? t('explore.tokens.favorite.action.remove')
+          : t('explore.tokens.favorite.action.add'),
         systemIcon: isFavorited ? 'heart.fill' : 'heart',
         onPress: onPressToggleFavorite,
       },
       ...(onEditFavorites
         ? [
             {
-              title: t('Edit favorites'),
+              title: t('explore.tokens.favorite.action.edit'),
               systemIcon: 'square.and.pencil',
               onPress: onEditFavorites,
             },
           ]
         : []),
-      { title: t('Swap'), systemIcon: 'arrow.2.squarepath', onPress: onPressSwap },
+      { title: t('common.button.swap'), systemIcon: 'arrow.2.squarepath', onPress: onPressSwap },
       {
-        title: t('Copy contract address'),
-        systemIcon: 'doc.on.doc',
-        onPress: onPressCopyContractAddress,
+        title: t('common.button.receive'),
+        systemIcon: 'qrcode',
+        onPress: onPressReceive,
       },
       ...(!onEditFavorites
         ? [
             {
-              title: t('Share'),
+              title: t('common.button.share'),
               systemIcon: 'square.and.arrow.up',
               onPress: onPressShare,
             },
@@ -129,7 +145,7 @@ export function useExploreTokenContextMenu({
       onPressToggleFavorite,
       onEditFavorites,
       onPressSwap,
-      onPressCopyContractAddress,
+      onPressReceive,
       onPressShare,
     ]
   )
@@ -142,4 +158,45 @@ export function useExploreTokenContextMenu({
   )
 
   return { menuActions, onContextMenuPress }
+}
+
+export function useAnimatedCardDragStyle(
+  isTouched: SharedValue<boolean>,
+  dragActivationProgress: SharedValue<number>
+): AnimateStyle<ViewStyle> {
+  const wasTouched = useSharedValue(false)
+  const dragAnimationProgress = useSharedValue(0)
+
+  useAnimatedReaction(
+    () => dragActivationProgress.value,
+    (activationProgress, prev) => {
+      const prevActivationProgress = prev ?? 0
+      // If the activation progress is increasing (the user is touching one of the cards)
+      if (activationProgress > prevActivationProgress) {
+        if (isTouched.value) {
+          // If the current card is the one being touched, reset the animation progress
+          wasTouched.value = true
+          dragAnimationProgress.value = 0
+        } else {
+          // Otherwise, animate the card
+          wasTouched.value = false
+          dragAnimationProgress.value = activationProgress
+        }
+      }
+      // If the activation progress is decreasing (the user is no longer touching one of the cards)
+      else {
+        if (isTouched.value || wasTouched.value) {
+          // If the current card is the one that was being touched, reset the animation progress
+          dragAnimationProgress.value = 0
+        } else {
+          // Otherwise, animate the card
+          dragAnimationProgress.value = activationProgress
+        }
+      }
+    }
+  )
+
+  return useAnimatedStyle(() => ({
+    opacity: interpolate(dragAnimationProgress.value, [0, 1], [1, 0.5]),
+  }))
 }

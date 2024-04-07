@@ -1,5 +1,6 @@
 import { createElement, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Icons } from 'ui/src'
 import { LogoWithTxStatus } from 'wallet/src/components/CurrencyLogo/LogoWithTxStatus'
 import { ChainId } from 'wallet/src/constants/chains'
 import { AssetType } from 'wallet/src/entities/assets'
@@ -17,6 +18,7 @@ import {
   TransactionDetails,
   TransactionType,
 } from 'wallet/src/features/transactions/types'
+import { useUnitagByAddress } from 'wallet/src/features/unitags/hooks'
 import { shortenAddress } from 'wallet/src/utils/addresses'
 import { getFormattedCurrencyAmount, getSymbolDisplayText } from 'wallet/src/utils/currency'
 import { buildCurrencyId } from 'wallet/src/utils/currencyId'
@@ -87,24 +89,30 @@ export function TransferTokenSummaryItem({
 
   // Search for matching ENS
   const { name: ensName } = useENS(ChainId.Mainnet, otherAddress, true)
-  const personDisplayName = ensName ?? shortenAddress(otherAddress)
+  const { unitag } = useUnitagByAddress(otherAddress)
+  const personDisplayName = unitag?.username ?? ensName ?? shortenAddress(otherAddress)
 
-  const translateOptions = {
-    what: isCurrency
-      ? (currencyAmount ?? '') + (getSymbolDisplayText(currencyInfo?.currency?.symbol) ?? '')
-      : transaction.typeInfo.nftSummaryInfo?.name,
-  }
+  const tokenAmountWithSymbol = isCurrency
+    ? (currencyAmount ?? '') + (getSymbolDisplayText(currencyInfo?.currency?.symbol) ?? '')
+    : transaction.typeInfo.nftSummaryInfo?.name
 
   let caption = ''
   if (transactionType === TransactionType.Send) {
-    caption = t('{{what}} to {{recipient}}', { recipient: personDisplayName, ...translateOptions })
+    caption = t('transaction.summary.received', {
+      recipientAddress: personDisplayName,
+      tokenAmountWithSymbol,
+    })
   } else {
-    caption = t('{{what}} from {{sender}}', { sender: personDisplayName, ...translateOptions })
+    caption = t('transaction.summary.sent', {
+      senderAddress: personDisplayName,
+      tokenAmountWithSymbol,
+    })
   }
 
   return createElement(layoutElement as React.FunctionComponent<TransactionSummaryLayoutProps>, {
     caption,
     icon,
     transaction,
+    postCaptionElement: unitag?.username ? <Icons.Unitag size="$icon.24" /> : undefined,
   })
 }

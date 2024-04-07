@@ -13,13 +13,15 @@ import Tooltip from 'components/Tooltip'
 import { isSupportedChain } from 'constants/chains'
 import ms from 'ms'
 import { darken } from 'polished'
-import { forwardRef, ReactNode, useCallback, useEffect, useState } from 'react'
+import { ReactNode, forwardRef, useCallback, useEffect, useState } from 'react'
 import { Lock } from 'react-feather'
 import styled, { useTheme } from 'styled-components'
 import { ThemedText } from 'theme/components'
 import { flexColumnNoWrap, flexRowNoWrap } from 'theme/styles'
 import { NumberType, useFormatter } from 'utils/formatNumbers'
 
+import { CurrencySearchFilters } from 'components/SearchModal/CurrencySearch'
+import { Text } from 'ui/src'
 import { ReactComponent as DropDown } from '../../assets/images/dropdown.svg'
 import { useCurrencyBalance } from '../../state/connection/hooks'
 import { ButtonGray } from '../Button'
@@ -56,17 +58,19 @@ const Container = styled.div<{ hideInput: boolean }>`
   width: ${({ hideInput }) => (hideInput ? '100%' : 'initial')};
 `
 
-const CurrencySelect = styled(ButtonGray)<{
+interface CurrencySelectProps {
   visible: boolean
   selected: boolean
   hideInput?: boolean
   disabled?: boolean
   animateShake?: boolean
-}>`
+}
+
+export const CurrencySelect = styled(ButtonGray)<CurrencySelectProps>`
   align-items: center;
   background-color: ${({ selected, theme }) => (selected ? theme.surface1 : theme.accent1)};
   opacity: ${({ disabled }) => (!disabled ? 1 : 0.4)};
-  color: ${({ selected, theme }) => (selected ? theme.neutral1 : theme.white)};
+  color: ${({ selected, theme }) => (selected ? theme.neutral1 : theme.neutralContrast)};
   cursor: pointer;
   height: 36px;
   border-radius: 18px;
@@ -143,6 +147,7 @@ const InputRow = styled.div`
   ${flexRowNoWrap};
   align-items: center;
   justify-content: space-between;
+  margin-top: 4px;
 `
 
 const LabelRow = styled.div`
@@ -177,7 +182,7 @@ const StyledDropDown = styled(DropDown)<{ selected: boolean }>`
   margin-left: 8px;
 
   path {
-    stroke: ${({ selected, theme }) => (selected ? theme.neutral1 : theme.white)};
+    stroke: ${({ selected, theme }) => (selected ? theme.neutral1 : theme.neutralContrast)};
     stroke-width: 2px;
   }
 `
@@ -223,13 +228,11 @@ interface SwapCurrencyInputPanelProps {
   fiatValue?: { data?: number; isLoading: boolean }
   priceImpact?: Percent
   id: string
-  showCommonBases?: boolean
-  showCurrencyAmount?: boolean
-  disableNonToken?: boolean
   renderBalance?: (amount: CurrencyAmount<Currency>) => ReactNode
   locked?: boolean
   loading?: boolean
   disabled?: boolean
+  currencySearchFilters?: CurrencySearchFilters
   numericalInputSettings?: {
     disabled?: boolean
     onDisabledClick?: () => void
@@ -248,9 +251,6 @@ const SwapCurrencyInputPanel = forwardRef<HTMLInputElement, SwapCurrencyInputPan
       currency,
       otherCurrency,
       id,
-      showCommonBases,
-      showCurrencyAmount,
-      disableNonToken,
       renderBalance,
       fiatValue,
       priceImpact,
@@ -260,6 +260,7 @@ const SwapCurrencyInputPanel = forwardRef<HTMLInputElement, SwapCurrencyInputPan
       locked = false,
       loading = false,
       disabled = false,
+      currencySearchFilters,
       numericalInputSettings,
       label,
       ...rest
@@ -296,15 +297,17 @@ const SwapCurrencyInputPanel = forwardRef<HTMLInputElement, SwapCurrencyInputPan
           <FixedContainer>
             <AutoColumn gap="sm" justify="center">
               <Lock />
-              <ThemedText.BodySecondary fontSize="12px" textAlign="center" padding="0 12px">
+              <Text variant="body2" textAlign="center" px="$spacing12">
                 <Trans>The market price is outside your specified price range. Single-asset deposit only.</Trans>
-              </ThemedText.BodySecondary>
+              </Text>
             </AutoColumn>
           </FixedContainer>
         )}
 
         <Container hideInput={hideInput}>
-          <ThemedText.SubHeaderSmall style={{ userSelect: 'none' }}>{label}</ThemedText.SubHeaderSmall>
+          <Text variant="body3" userSelect="none" color="$neutral2">
+            {label}
+          </Text>
           <InputRow style={hideInput ? { padding: '0', borderRadius: '8px' } : {}}>
             {!hideInput && (
               <div style={{ display: 'flex', flexGrow: 1 }} onClick={handleDisabledNumericalInputClick}>
@@ -316,6 +319,7 @@ const SwapCurrencyInputPanel = forwardRef<HTMLInputElement, SwapCurrencyInputPan
                   $loading={loading}
                   id={id}
                   ref={ref}
+                  maxDecimals={currency?.decimals}
                 />
               </div>
             )}
@@ -424,9 +428,7 @@ const SwapCurrencyInputPanel = forwardRef<HTMLInputElement, SwapCurrencyInputPan
             onCurrencySelect={onCurrencySelect}
             selectedCurrency={currency}
             otherSelectedCurrency={otherCurrency}
-            showCommonBases={showCommonBases}
-            showCurrencyAmount={showCurrencyAmount}
-            disableNonToken={disableNonToken}
+            currencySearchFilters={currencySearchFilters}
           />
         )}
       </InputPanel>

@@ -1,30 +1,31 @@
+import { ApolloError } from '@apollo/client'
 import { Trans } from '@lingui/macro'
 import { createColumnHelper } from '@tanstack/react-table'
-import { ChainId } from '@uniswap/sdk-core'
+import Row from 'components/Row'
 import { Table } from 'components/Table'
 import { Cell } from 'components/Table/Cell'
 import { Filter } from 'components/Table/Filter'
 import {
-  ClickableHeaderRow,
   FilterHeaderRow,
   HeaderArrow,
+  HeaderSortText,
   StyledExternalLink,
-  StyledInternalLink,
+  TimestampCell,
+  TokenLinkCell,
 } from 'components/Table/styled'
-import { getLocaleTimeString } from 'components/Table/utils'
-import { DEFAULT_LOCALE } from 'constants/locales'
+import { useUpdateManualOutage } from 'featureFlags/flags/outageBanner'
+import { BETypeToTransactionType, TransactionType, useAllTransactions } from 'graphql/data/useAllTransactions'
 import { supportedChainIdFromGQLChain, validateUrlChainParam } from 'graphql/data/util'
 import { OrderDirection, Transaction_OrderBy } from 'graphql/thegraph/__generated__/types-and-hooks'
-import { Transaction, TransactionType, useRecentTransactions } from 'graphql/thegraph/Transactions'
 import { useActiveLocalCurrency } from 'hooks/useActiveLocalCurrency'
-import { useActiveLocale } from 'hooks/useActiveLocale'
-import { useOnClickOutside } from 'hooks/useOnClickOutside'
-import { useCallback, useMemo, useReducer, useRef, useState } from 'react'
-import { ExternalLink as ExternalLinkIcon } from 'react-feather'
+import { useMemo, useReducer, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useTheme } from 'styled-components'
 import { ThemedText } from 'theme/components'
-import { shortenAddress } from 'utils/addresses'
+import {
+  PoolTransaction,
+  PoolTransactionType,
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
+import { shortenAddress } from 'utilities/src/addresses'
 import { useFormatter } from 'utils/formatNumbers'
 import { ExplorerDataType, getExplorerLink } from 'utils/getExplorerLink'
 
@@ -34,85 +35,67 @@ type ExploreTxTableSortState = {
 }
 
 export default function RecentTransactions() {
-  const theme = useTheme()
-  const locale = useActiveLocale()
   const activeLocalCurrency = useActiveLocalCurrency()
   const { formatNumber, formatFiatPrice } = useFormatter()
   const [filterModalIsOpen, toggleFilterModal] = useReducer((s) => !s, false)
-  const filterModalRef = useRef<HTMLDivElement>(null)
-  useOnClickOutside(filterModalRef, filterModalIsOpen ? toggleFilterModal : undefined)
   const [filter, setFilters] = useState<TransactionType[]>([
     TransactionType.SWAP,
     TransactionType.BURN,
     TransactionType.MINT,
   ])
-
   const chainName = validateUrlChainParam(useParams<{ chainName?: string }>().chainName)
   const chainId = supportedChainIdFromGQLChain(chainName)
 
-  const [sortState, setSortMethod] = useState<ExploreTxTableSortState>({
+  const [sortState] = useState<ExploreTxTableSortState>({
     sortBy: Transaction_OrderBy.Timestamp,
     sortDirection: OrderDirection.Desc,
   })
-  const { transactions, loading, loadMore } = useRecentTransactions(
-    chainId ?? ChainId.MAINNET,
-    sortState.sortBy,
-    sortState.sortDirection,
-    filter
-  )
-
-  const handleHeaderClick = useCallback(
-    (newSortMethod: Transaction_OrderBy) => {
-      if (sortState.sortBy === newSortMethod) {
-        setSortMethod({
-          sortBy: newSortMethod,
-          sortDirection: sortState.sortDirection === OrderDirection.Asc ? OrderDirection.Desc : OrderDirection.Asc,
-        })
-      } else {
-        setSortMethod({
-          sortBy: newSortMethod,
-          sortDirection: OrderDirection.Desc,
-        })
-      }
-    },
-    [sortState.sortBy, sortState.sortDirection]
-  )
+  const { transactions, loading, loadMore, errorV2, errorV3 } = useAllTransactions(chainName, filter)
+  const combinedError =
+    errorV2 && errorV3
+      ? new ApolloError({ errorMessage: `Could not retrieve V2 and V3 Transactions for chain: ${chainId}` })
+      : undefined
+  const allDataStillLoading = loading && !transactions.length
+  const showLoadingSkeleton = allDataStillLoading || !!combinedError
+  useUpdateManualOutage({ chainId, errorV3, errorV2 })
   // TODO(WEB-3236): once GQL BE Transaction query is supported add usd, token0 amount, and token1 amount sort support
   const columns = useMemo(() => {
-    const columnHelper = createColumnHelper<Transaction>()
+    const columnHelper = createColumnHelper<PoolTransaction>()
     return [
-      columnHelper.accessor((transaction) => transaction.timestamp, {
+      columnHelper.accessor((transaction) => transaction, {
         id: 'timestamp',
         header: () => (
-          <Cell minWidth={185} justifyContent="flex-start" grow>
-            <ClickableHeaderRow $justify="flex-start" onClick={() => handleHeaderClick(Transaction_OrderBy.Timestamp)}>
+          <Cell minWidth={120} justifyContent="flex-start" grow>
+            <Row gap="4px">
               {sortState.sortBy === Transaction_OrderBy.Timestamp && (
                 <HeaderArrow direction={sortState.sortDirection} />
               )}
-              <ThemedText.BodySecondary>
+              <HeaderSortText $active={sortState.sortBy === Transaction_OrderBy.Timestamp}>
                 <Trans>Time</Trans>
-              </ThemedText.BodySecondary>
-            </ClickableHeaderRow>
+              </HeaderSortText>
+            </Row>
           </Cell>
         ),
-        cell: (timestamp) => (
-          <Cell loading={loading} minWidth={185} justifyContent="flex-start" grow>
-            <ThemedText.BodySecondary>
-              {getLocaleTimeString(Number(timestamp.getValue?.()) * 1000, locale ?? DEFAULT_LOCALE)}
-            </ThemedText.BodySecondary>
+        cell: (transaction) => (
+          <Cell loading={showLoadingSkeleton} minWidth={120} justifyContent="flex-start" grow>
+            <TimestampCell
+              timestamp={Number(transaction.getValue?.().timestamp)}
+              link={getExplorerLink(chainId, transaction.getValue?.().hash, ExplorerDataType.TRANSACTION)}
+            />
           </Cell>
         ),
       }),
       columnHelper.accessor((transaction) => transaction, {
         id: 'swap-type',
         header: () => (
-          <Cell minWidth={185} justifyContent="flex-start" grow>
-            <FilterHeaderRow modalOpen={filterModalIsOpen} onClick={() => toggleFilterModal()} ref={filterModalRef}>
+          <Cell minWidth={276} justifyContent="flex-start" grow>
+            <FilterHeaderRow modalOpen={filterModalIsOpen} onClick={() => toggleFilterModal()}>
               <Filter
                 allFilters={Object.values(TransactionType)}
                 activeFilter={filter}
                 setFilters={setFilters}
                 isOpen={filterModalIsOpen}
+                toggleFilterModal={toggleFilterModal}
                 isSticky={true}
               />
               <ThemedText.BodySecondary>
@@ -122,25 +105,21 @@ export default function RecentTransactions() {
           </Cell>
         ),
         cell: (transaction) => (
-          <Cell loading={loading} minWidth={185} justifyContent="flex-start" grow>
-            <ThemedText.BodyPrimary>
-              {transaction.getValue?.().type}{' '}
-              <StyledInternalLink
-                to={`/explore/tokens/${chainName.toLowerCase()}/${transaction.getValue?.().token0Address}`}
-              >
-                {transaction.getValue?.().token0Symbol}
-              </StyledInternalLink>{' '}
-              {transaction.getValue?.().type === TransactionType.SWAP ? <Trans>for</Trans> : <Trans>and</Trans>}{' '}
-              <StyledInternalLink
-                to={`/explore/tokens/${chainName.toLowerCase()}/${transaction.getValue?.().token1Address}`}
-              >
-                {transaction.getValue?.().token1Symbol}
-              </StyledInternalLink>{' '}
-            </ThemedText.BodyPrimary>
+          <Cell loading={showLoadingSkeleton} minWidth={276} justifyContent="flex-start" grow>
+            <Row gap="8px">
+              <ThemedText.BodySecondary>
+                <Trans>{BETypeToTransactionType[transaction.getValue?.().type]}</Trans>
+              </ThemedText.BodySecondary>
+              <TokenLinkCell token={transaction.getValue?.().token0} />
+              <ThemedText.BodySecondary>
+                {transaction.getValue?.().type === PoolTransactionType.Swap ? <Trans>for</Trans> : <Trans>and</Trans>}
+              </ThemedText.BodySecondary>
+              <TokenLinkCell token={transaction.getValue?.().token1} />
+            </Row>
           </Cell>
         ),
       }),
-      columnHelper.accessor((transaction) => transaction.amountUSD, {
+      columnHelper.accessor((transaction) => transaction.usdValue.value, {
         id: 'fiat-value',
         header: () => (
           <Cell minWidth={125}>
@@ -148,7 +127,7 @@ export default function RecentTransactions() {
           </Cell>
         ),
         cell: (fiat) => (
-          <Cell loading={loading} minWidth={125}>
+          <Cell loading={showLoadingSkeleton} minWidth={125}>
             <ThemedText.BodyPrimary>{formatFiatPrice({ price: fiat.getValue?.() })}</ThemedText.BodyPrimary>
           </Cell>
         ),
@@ -163,17 +142,15 @@ export default function RecentTransactions() {
           </Cell>
         ),
         cell: (transaction) => (
-          <Cell loading={loading} minWidth={200}>
-            <ThemedText.BodyPrimary>
-              {formatNumber({
-                input: Math.abs(transaction.getValue?.().amountToken0) || 0,
-              })}{' '}
-              <StyledInternalLink
-                to={`/explore/tokens/${chainName.toLowerCase()}/${transaction.getValue?.().token0Address}`}
-              >
-                {transaction.getValue?.().token0Symbol}
-              </StyledInternalLink>
-            </ThemedText.BodyPrimary>
+          <Cell loading={showLoadingSkeleton} minWidth={200}>
+            <Row gap="8px" justify="flex-end">
+              <ThemedText.BodyPrimary>
+                {formatNumber({
+                  input: Math.abs(parseFloat(transaction.getValue?.().token0Quantity)) || 0,
+                })}
+              </ThemedText.BodyPrimary>
+              <TokenLinkCell token={transaction.getValue?.().token0} />
+            </Row>
           </Cell>
         ),
       }),
@@ -187,73 +164,56 @@ export default function RecentTransactions() {
           </Cell>
         ),
         cell: (transaction) => (
-          <Cell loading={loading} minWidth={200}>
-            <ThemedText.BodyPrimary>
-              {formatNumber({
-                input: Math.abs(transaction.getValue?.().amountToken1) || 0,
-              })}{' '}
-              <StyledInternalLink
-                to={`/explore/tokens/${chainName.toLowerCase()}/${transaction.getValue?.().token1Address}`}
-              >
-                {transaction.getValue?.().token1Symbol}
-              </StyledInternalLink>
-            </ThemedText.BodyPrimary>
+          <Cell loading={showLoadingSkeleton} minWidth={200}>
+            <Row gap="8px" justify="flex-end">
+              <ThemedText.BodyPrimary>
+                {formatNumber({
+                  input: Math.abs(parseFloat(transaction.getValue?.().token1Quantity)) || 0,
+                })}
+              </ThemedText.BodyPrimary>
+              <TokenLinkCell token={transaction.getValue?.().token1} />
+            </Row>
           </Cell>
         ),
       }),
-      columnHelper.accessor((transaction) => transaction.sender, {
+      columnHelper.accessor((transaction) => transaction.account, {
         id: 'maker-address',
         header: () => (
-          <Cell minWidth={125}>
+          <Cell minWidth={150}>
             <ThemedText.BodySecondary>
               <Trans>Wallet</Trans>
             </ThemedText.BodySecondary>
           </Cell>
         ),
         cell: (makerAddress) => (
-          <Cell loading={loading} minWidth={125}>
+          <Cell loading={showLoadingSkeleton} minWidth={150}>
             <StyledExternalLink href={getExplorerLink(chainId, makerAddress.getValue?.(), ExplorerDataType.ADDRESS)}>
-              {shortenAddress(makerAddress.getValue?.(), 0)}
+              {shortenAddress(makerAddress.getValue?.())}
             </StyledExternalLink>
           </Cell>
         ),
       }),
-      columnHelper.accessor(
-        (transaction) => getExplorerLink(chainId ?? ChainId.MAINNET, transaction.hash, ExplorerDataType.TRANSACTION),
-        {
-          id: 'explorer-link',
-          header: () => (
-            <Cell minWidth={60}>
-              <ThemedText.BodySecondary>
-                <Trans>Tx</Trans>
-              </ThemedText.BodySecondary>
-            </Cell>
-          ),
-          cell: (explorerLink) => (
-            <Cell loading={loading} minWidth={60}>
-              <StyledExternalLink href={explorerLink.getValue?.()}>
-                <ExternalLinkIcon size="16px" stroke={theme.neutral2} />
-              </StyledExternalLink>
-            </Cell>
-          ),
-        }
-      ),
     ]
   }, [
     activeLocalCurrency,
     chainId,
-    chainName,
     filter,
     filterModalIsOpen,
     formatFiatPrice,
     formatNumber,
-    handleHeaderClick,
-    loading,
-    locale,
+    showLoadingSkeleton,
     sortState.sortBy,
     sortState.sortDirection,
-    theme.neutral2,
   ])
 
-  return <Table columns={columns} data={transactions} loading={loading} loadMore={loadMore} />
+  return (
+    <Table
+      columns={columns}
+      data={transactions}
+      loading={allDataStillLoading}
+      error={combinedError}
+      loadMore={loadMore}
+      maxWidth={1200}
+    />
+  )
 }

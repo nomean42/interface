@@ -1,10 +1,9 @@
-import { useHeaderHeight } from '@react-navigation/elements'
 import React, { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { navigate } from 'src/app/navigation/rootNavigation'
 import { UnitagStackScreenProp } from 'src/app/navigation/types'
 import { AnimateInOrder } from 'src/components/animation/AnimateInOrder'
-import { Screen, SHORT_SCREEN_HEADER_HEIGHT_RATIO } from 'src/components/layout/Screen'
+import { Screen } from 'src/components/layout/Screen'
 import { UnitagWithProfilePicture } from 'src/components/unitags/UnitagWithProfilePicture'
 import {
   EmojiElement,
@@ -26,7 +25,6 @@ export function UnitagConfirmationScreen({
   route,
 }: UnitagStackScreenProp<UnitagScreens.UnitagConfirmation>): JSX.Element {
   const { unitag, address, profilePictureUri } = route.params
-  const headerHeight = useHeaderHeight()
   const dimensions = useDeviceDimensions()
   const insets = useDeviceInsets()
   const { t } = useTranslation()
@@ -56,7 +54,10 @@ export function UnitagConfirmationScreen({
       { element: <HeartElement />, coordinates: { x: 9, y: 7 } },
       { element: <SwapElement />, coordinates: { x: 10, y: 10 } },
       { element: <ENSElement />, coordinates: { x: 1, y: 8.5 } },
-      { element: <TextElement text={t('got it!')} />, coordinates: { x: 0, y: 5 } },
+      {
+        element: <TextElement text={t('unitags.claim.confirmation.success.short')} />,
+        coordinates: { x: 0, y: 5 },
+      },
       { element: <SendElement />, coordinates: { x: 1, y: 2 } },
       { element: <EmojiElement emoji="👍" />, coordinates: { x: 3.5, y: 2.5 } },
     ],
@@ -64,18 +65,14 @@ export function UnitagConfirmationScreen({
   )
 
   return (
-    <Screen
-      $short={{ pt: headerHeight * SHORT_SCREEN_HEADER_HEIGHT_RATIO }}
-      edges={['right', 'left', 'bottom']}
-      pt={headerHeight}>
+    <Screen edges={['right', 'left', 'bottom']} pt="$spacing60">
       <Flex grow gap="$spacing16" justifyContent="space-between" pb="$spacing16" px="$spacing16">
         <Flex centered grow>
           <AnimatePresence exitBeforeEnter>
             <AnimateInOrder
-              // eslint-disable-next-line react-native/no-inline-styles
-              enterStyle={{ o: 0, scale: 0.5 }}
-              // eslint-disable-next-line react-native/no-inline-styles
-              exitStyle={{ o: 0, scale: 0.5 }}
+              key="outerCircle"
+              enterStyle={{ opacity: 0, scale: 0.5 }}
+              exitStyle={{ opacity: 0, scale: 0.5 }}
               index={1}
               position="absolute">
               <Flex
@@ -87,10 +84,9 @@ export function UnitagConfirmationScreen({
               />
             </AnimateInOrder>
             <AnimateInOrder
-              // eslint-disable-next-line react-native/no-inline-styles
-              enterStyle={{ o: 0, scale: 0.5 }}
-              // eslint-disable-next-line react-native/no-inline-styles
-              exitStyle={{ o: 0, scale: 0.5 }}
+              key="innerCircle"
+              enterStyle={{ opacity: 0, scale: 0.5 }}
+              exitStyle={{ opacity: 0, scale: 0.5 }}
               index={2}
               position="absolute">
               <Flex
@@ -111,7 +107,7 @@ export function UnitagConfirmationScreen({
                 {element}
               </AnimateInOrder>
             ))}
-            <AnimateInOrder hapticOnEnter index={12}>
+            <AnimateInOrder key="unitag" hapticOnEnter index={12}>
               <UnitagWithProfilePicture
                 address={address}
                 profilePictureUri={profilePictureUri}
@@ -122,21 +118,20 @@ export function UnitagConfirmationScreen({
         </Flex>
         <Flex centered gap="$spacing16" pb="$spacing16" px="$spacing24">
           <Text color="$neutral1" textAlign="center" variant="heading3">
-            {t('You got it!')}
+            {t('unitags.claim.confirmation.success.long')}
           </Text>
           <Text color="$neutral2" textAlign="center" variant="subheading2">
-            {t(
-              '{{unitag}}{{unitagSuffix}} is ready to send and receive crypto. Continue to build out your wallet by customizing your profile',
-              { unitag, unitagSuffix: UNITAG_SUFFIX }
-            )}
+            {t('unitags.claim.confirmation.description', {
+              unitagAddress: `${unitag}${UNITAG_SUFFIX}`,
+            })}
           </Text>
         </Flex>
         <Flex gap="$spacing12">
           <Button size="medium" theme="primary" onPress={onPressDone}>
-            {t('Done')}
+            {t('common.button.done')}
           </Button>
           <Button size="medium" theme="secondary" onPress={onPressCustomize}>
-            {t('Customize profile')}
+            {t('unitags.claim.confirmation.customize')}
           </Button>
         </Flex>
       </Flex>

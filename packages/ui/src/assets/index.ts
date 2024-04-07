@@ -13,8 +13,15 @@ export const ONBOARDING_QR_ETCHING_VIDEO_DARK = require('./videos/dark-etching.m
 export const AVATARS_LIGHT = require('./misc/avatars-light.png')
 export const AVATARS_DARK = require('./misc/avatars-dark.png')
 export const APP_SCREENSHOT_ICON = require('./misc/app-screenshot-icon.png')
-export const UNITAGS_BANNER_HORIZONTAL = require('./misc/unitags-banner-h.png')
-export const UNITAGS_BANNER_VERTICAL = require('./misc/unitags-banner-v.png')
+export const UNITAGS_BANNER_VERTICAL_LIGHT = require('./graphics/unitags-banner-v-light.png')
+export const UNITAGS_BANNER_VERTICAL_DARK = require('./graphics/unitags-banner-v-dark.png')
+export const UNITAGS_INTRO_BANNER_LIGHT = require('./graphics/unitags-intro-banner-light.png')
+export const UNITAGS_INTRO_BANNER_DARK = require('./graphics/unitags-intro-banner-dark.png')
+
+export const EXTENSION_PROMO_BANNER_LIGHT = require('./graphics/extension-promo-banner-light.png')
+export const EXTENSION_PROMO_BANNER_DARK = require('./graphics/extension-promo-banner-dark.png')
+export const EXTENSION_PROMO_MODAL_LIGHT = require('./graphics/extension-promo-modal-light.png')
+export const EXTENSION_PROMO_MODAL_DARK = require('./graphics/extension-promo-modal-dark.png')
 
 export const DAI_LOGO = require('./logos/png/dai-logo.png')
 export const USDC_LOGO = require('./logos/png/usdc-logo.png')
@@ -22,6 +29,9 @@ export const ETH_LOGO = require('./logos/png/eth-logo.png')
 export const OPENSEA_LOGO = require('./logos/png/opensea-logo.png')
 export const ENS_LOGO = require('./logos/png/ens-logo.png')
 export const FROGGY = require('./graphics/froggy.png')
+
+export const UNITAG_DARK = require('./graphics/unitag-dark.png')
+export const UNITAG_LIGHT = require('./graphics/unitag-light.png')
 
 export const ONBOARDING_LANDING_LIGHT = {
   ios: require(`./backgrounds/onboarding-landing-static-light.png`),
@@ -52,3 +62,5 @@ export const SECURITY_SCREEN_BACKGROUND_LIGHT = {
   ios: require(`./backgrounds/ios/security-background-light.png`),
   android: require(`./backgrounds/android/security-background-light.png`),
 }
+
+export const DEAD_LUNI = require('./graphics/dead-luni.png')

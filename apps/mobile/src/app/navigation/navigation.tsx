@@ -23,6 +23,7 @@ import { DevScreen } from 'src/screens/DevScreen'
 import { EducationScreen } from 'src/screens/EducationScreen'
 import { ExploreScreen } from 'src/screens/ExploreScreen'
 import { ExternalProfileScreen } from 'src/screens/ExternalProfileScreen'
+import { FiatOnRampConnectingScreen } from 'src/screens/FiatOnRampConnecting'
 import { FiatOnRampScreen } from 'src/screens/FiatOnRampScreen'
 import { FiatOnRampServiceProvidersScreen } from 'src/screens/FiatOnRampServiceProviders'
 import { HomeScreen } from 'src/screens/HomeScreen'
@@ -44,8 +45,8 @@ import { EditNameScreen } from 'src/screens/Onboarding/EditNameScreen'
 import { LandingScreen } from 'src/screens/Onboarding/LandingScreen'
 import { ManualBackupScreen } from 'src/screens/Onboarding/ManualBackupScreen'
 import { NotificationsSetupScreen } from 'src/screens/Onboarding/NotificationsSetupScreen'
-import { QRAnimationScreen } from 'src/screens/Onboarding/QRAnimationScreen'
 import { SecuritySetupScreen } from 'src/screens/Onboarding/SecuritySetupScreen'
+import { WelcomeWalletScreen } from 'src/screens/Onboarding/WelcomeWalletScreen'
 import { FiatOnRampScreens, OnboardingScreens, Screens, UnitagScreens } from 'src/screens/Screens'
 import { SettingsAppearanceScreen } from 'src/screens/SettingsAppearanceScreen'
 import { SettingsBiometricAuthScreen } from 'src/screens/SettingsBiometricAuthScreen'
@@ -63,8 +64,8 @@ import { TokenDetailsScreen } from 'src/screens/TokenDetailsScreen'
 import { WebViewScreen } from 'src/screens/WebViewScreen'
 import { Icons, useDeviceInsets, useSporeColors } from 'ui/src'
 import { spacing } from 'ui/src/theme'
-import { FEATURE_FLAGS } from 'wallet/src/features/experiments/constants'
-import { useFeatureFlag } from 'wallet/src/features/experiments/hooks'
+import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
+import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
 import { OnboardingEntryPoint } from 'wallet/src/features/onboarding/types'
 import { useActiveAccountWithThrow } from 'wallet/src/features/wallet/hooks'
 import { selectFinishedOnboarding } from 'wallet/src/features/wallet/selectors'
@@ -197,13 +198,16 @@ export function FiatOnRampStackNavigator(): JSX.Element {
             component={FiatOnRampServiceProvidersScreen}
             name={FiatOnRampScreens.ServiceProviders}
           />
+          <FiatOnRampStack.Screen
+            component={FiatOnRampConnectingScreen}
+            name={FiatOnRampScreens.Connecting}
+          />
         </FiatOnRampStack.Navigator>
       </FiatOnRampProvider>
     </NavigationContainer>
   )
 }
 
-const renderEmptyBackImage = (): JSX.Element => <></>
 const renderHeaderBackImage = (): JSX.Element => (
   <Icons.RotatableChevron color="$neutral2" height={28} width={28} />
 )
@@ -211,7 +215,7 @@ const renderHeaderBackImage = (): JSX.Element => (
 export function OnboardingStackNavigator(): JSX.Element {
   const colors = useSporeColors()
   const insets = useDeviceInsets()
-  const seedPhraseRefactorEnabled = useFeatureFlag(FEATURE_FLAGS.SeedPhraseRefactorNative)
+  const seedPhraseRefactorEnabled = useFeatureFlag(FeatureFlags.SeedPhraseRefactorNative)
   const SeedPhraseInputComponent = seedPhraseRefactorEnabled
     ? SeedPhraseInputScreenV2
     : SeedPhraseInputScreen
@@ -254,18 +258,8 @@ export function OnboardingStackNavigator(): JSX.Element {
           name={OnboardingScreens.BackupManual}
         />
         <OnboardingStack.Screen
-          component={QRAnimationScreen}
-          name={OnboardingScreens.QRAnimation}
-          // There should be no header shown on this screen but if headerShown: false and the user is adding a wallet from the
-          // sidebar then when this screen is navigated away from the header will reappear on the home screen on top of the account
-          // header.
-          // To fix this the header is shown but the backImage is hidden so it appears as if there is no header. This is v hacky but
-          // I think it's a react navigation bug and I couldn't find a better solution. Feel free to debug if you're bored.
-          options={{
-            headerShown: true,
-            gestureEnabled: false,
-            headerBackImage: renderEmptyBackImage,
-          }}
+          component={WelcomeWalletScreen}
+          name={OnboardingScreens.WelcomeWallet}
         />
         <OnboardingStack.Screen
           component={CloudBackupProcessingScreen}
@@ -340,8 +334,13 @@ export function UnitagStackNavigator(): JSX.Element {
         <UnitagStack.Screen
           component={UnitagConfirmationScreen}
           name={UnitagScreens.UnitagConfirmation}
+          options={{ ...navOptions.noHeader, gestureEnabled: false }}
         />
-        <UnitagStack.Screen component={EditUnitagProfileScreen} name={UnitagScreens.EditProfile} />
+        <UnitagStack.Screen
+          component={EditUnitagProfileScreen}
+          name={UnitagScreens.EditProfile}
+          options={{ ...navOptions.noHeader, gestureEnabled: false }}
+        />
       </UnitagStack.Group>
     </UnitagStack.Navigator>
   )

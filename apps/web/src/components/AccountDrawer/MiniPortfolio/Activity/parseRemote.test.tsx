@@ -207,6 +207,9 @@ describe('parseRemote', () => {
       expect(result).toEqual({
         chainId: 1,
         status: 'filled',
+        id: 'tx123',
+        offerer: '0xSenderAddress',
+        orderHash: '0xHashValue',
         swapInfo: {
           expectedOutputCurrencyAmountRaw: '100000000000000000000',
           inputCurrencyAmountRaw: '100000000000000000000',
@@ -219,7 +222,6 @@ describe('parseRemote', () => {
           type: 1,
         },
         txHash: '0xHashValue',
-        type: 'signUniswapXOrder',
         addedTime: 10000,
       })
     })

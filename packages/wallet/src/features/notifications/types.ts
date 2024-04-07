@@ -1,4 +1,5 @@
 import { TradeType } from '@uniswap/sdk-core'
+import { CurrencyInfo } from 'uniswap/src/features/dataApi/types'
 import { ChainId } from 'wallet/src/constants/chains'
 import { AssetType } from 'wallet/src/entities/assets'
 import {
@@ -15,15 +16,17 @@ export enum AppNotificationType {
   Transaction,
   Favorites,
   Copied,
+  CopyFailed,
   Success,
   SwapNetwork,
   ChooseCountry,
   AssetVisibility, // could be token or NFT
   SwapPending,
+  TransferCurrencyPending,
   ScantasticComplete,
 }
 
-interface AppNotificationBase {
+export interface AppNotificationBase {
   type: AppNotificationType
   address?: Address
   hideDelay?: number
@@ -77,7 +80,7 @@ export interface WrapTxNotification extends TransactionNotificationBase {
   unwrapped: boolean
 }
 
-interface TransferCurrencyTxNotificationBase extends TransactionNotificationBase {
+export interface TransferCurrencyTxNotificationBase extends TransactionNotificationBase {
   txType: TransactionType.Send | TransactionType.Receive
   assetType: AssetType.Currency
   tokenAddress: string
@@ -94,7 +97,7 @@ export interface ReceiveCurrencyTxNotification extends TransferCurrencyTxNotific
   sender: Address
 }
 
-interface TransferNFTNotificationBase extends TransactionNotificationBase {
+export interface TransferNFTNotificationBase extends TransactionNotificationBase {
   txType: TransactionType.Send | TransactionType.Receive
   assetType: AssetType.ERC1155 | AssetType.ERC721
   tokenAddress: string
@@ -132,12 +135,18 @@ export type TransactionNotification =
 export enum CopyNotificationType {
   Address = 'address',
   ContractAddress = 'contractAddress',
+  Calldata = 'calldata',
   TransactionId = 'transactionId',
   Image = 'image',
 }
 
 export interface CopyNotification extends AppNotificationBase {
   type: AppNotificationType.Copied
+  copyType: CopyNotificationType
+}
+
+export interface CopyFailedNotification extends AppNotificationBase {
+  type: AppNotificationType.CopyFailed
   copyType: CopyNotificationType
 }
 
@@ -168,6 +177,11 @@ export interface SwapPendingNotification extends AppNotificationBase {
   wrapType: WrapType
 }
 
+export interface TransferCurrencyPendingNotification extends AppNotificationBase {
+  type: AppNotificationType.TransferCurrencyPending
+  currencyInfo: CurrencyInfo
+}
+
 export interface ScantasticCompleteNotification extends AppNotificationBase {
   type: AppNotificationType.ScantasticComplete
 }
@@ -176,7 +190,9 @@ export type AppNotification =
   | AppNotificationDefault
   | AppErrorNotification
   | SwapPendingNotification
+  | TransferCurrencyPendingNotification
   | CopyNotification
+  | CopyFailedNotification
   | WalletConnectNotification
   | TransactionNotification
   | SwapNetworkNotification

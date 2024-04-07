@@ -1,26 +1,32 @@
 import { Trans } from '@lingui/macro'
 import { ChartHeader } from 'components/Charts/ChartHeader'
 import { Chart } from 'components/Charts/ChartModel'
-import { StackedLineData, TVLChartModel } from 'components/Charts/StackedLineChart'
-import {
-  getCumulativeVolume,
-  getVolumeProtocolInfo,
-  StackedVolumeChartModel,
-} from 'components/Charts/StackedVolumeChart'
-import { StackedBarsData } from 'components/Charts/StackedVolumeChart/renderer'
-import { getCumulativeSum } from 'components/Charts/StackedVolumeChart/stacked-bar-series'
+import { ChartSkeleton } from 'components/Charts/LoadingState'
+import { TVLChartModel } from 'components/Charts/StackedLineChart'
 import TimePeriodSelector from 'components/Charts/TimeSelector'
-import { getTimePeriodDisplay } from 'components/Charts/VolumeChart'
+import { formatHistoryDuration } from 'components/Charts/VolumeChart'
+import { CustomVolumeChartModel } from 'components/Charts/VolumeChart/CustomVolumeChartModel'
+import { StackedHistogramData } from 'components/Charts/VolumeChart/renderer'
+import { getCumulativeSum, getCumulativeVolume, getVolumeProtocolInfo } from 'components/Charts/VolumeChart/utils'
+import { ChartType } from 'components/Charts/utils'
 import Column from 'components/Column'
 import { RowBetween } from 'components/Row'
+import { DataQuality } from 'components/Tokens/TokenDetails/ChartSection/util'
 import { MAX_WIDTH_MEDIA_BREAKPOINT } from 'components/Tokens/constants'
-import { PriceSource } from 'graphql/data/__generated__/types-and-hooks'
-import { getProtocolColor, TimePeriod } from 'graphql/data/util'
+import { useDailyProtocolTVL, useHistoricalProtocolVolume } from 'graphql/data/protocolStats'
+import {
+  TimePeriod,
+  chainIdToBackendName,
+  getProtocolColor,
+  supportedChainIdFromGQLChain,
+  validateUrlChainParam,
+} from 'graphql/data/util'
 import { useScreenSize } from 'hooks/useScreenSize'
-import { HARDCODED_TVL_DATA, HARDCODED_VOLUME_DATA } from 'pages/Explore/charts/mockData'
+import { useExploreParams } from 'pages/Explore/redirects'
 import { ReactNode, useMemo, useState } from 'react'
 import styled, { useTheme } from 'styled-components'
-import { ThemedText } from 'theme/components'
+import { EllipsisStyle, ThemedText } from 'theme/components'
+import { HistoryDuration, PriceSource } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import { NumberType, useFormatter } from 'utils/formatNumbers'
 
 const EXPLORE_CHART_HEIGHT_PX = 368
@@ -52,6 +58,10 @@ const SectionContainer = styled(Column)`
   width: 47%;
   gap: 4px;
 
+  > * {
+    ${EllipsisStyle}
+  }
+
   @media only screen and (max-width: ${({ theme }) => `${theme.breakpoint.sm}px`}) {
     background-color: ${({ theme }) => theme.surface2};
     border-radius: 20px;
@@ -68,41 +78,45 @@ const SectionTitle = styled(ThemedText.SubHeader)`
   color: ${({ theme }) => theme.neutral2};
   white-space: nowrap;
 `
-const StyledChart = styled(Chart)`
+const StyledChart: typeof Chart = styled(Chart)`
   height: ${EXPLORE_CHART_HEIGHT_PX}px;
-` /* cast preserves generic Chart props that the `styled` return type looses: */ as typeof Chart
+`
 
-function VolumeChartSection({ data }: { data: StackedBarsData[] }) {
+function VolumeChartSection({ chainId }: { chainId: number }) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(TimePeriod.DAY)
+  const theme = useTheme()
+  const isSmallScreen = !useScreenSize()['sm']
 
-  const mockDataForTimePeriod = useMemo(() => {
+  function timeGranularityToHistoryDuration(timePeriod: TimePeriod): HistoryDuration {
     // note: timePeriod on the Explore Page represents the GRANULARITY, not the timespan of data shown.
-    // i.e. timePeriod == D shows 1month data, timePeriod == W shows 1year data, timePeriod == M shows alltime data
-    let numDataPoints = 0
+    // i.e. timePeriod == D shows 1month data, timePeriod == W shows 1year data, timePeriod == M shows past 3Y data
     switch (timePeriod) {
       case TimePeriod.DAY:
-        numDataPoints = 30
-        break
+      default:
+        return HistoryDuration.Month
       case TimePeriod.WEEK:
-        numDataPoints = 52
-        break
+        return HistoryDuration.Year
       case TimePeriod.MONTH:
-        numDataPoints = 36
-        break
+        return HistoryDuration.Max
     }
+  }
 
-    return data.slice(-numDataPoints)
-  }, [timePeriod, data])
-
-  const theme = useTheme()
-
-  const params = useMemo<{ data: StackedBarsData[]; colors: [string, string] }>(
-    () => ({ data: mockDataForTimePeriod, colors: [theme.accent1, theme.accent3] }),
-    [mockDataForTimePeriod, theme]
+  const { entries, loading, dataQuality } = useHistoricalProtocolVolume(
+    chainIdToBackendName(chainId),
+    isSmallScreen ? HistoryDuration.Month : timeGranularityToHistoryDuration(timePeriod)
   )
-  const cumulativeVolume = useMemo(() => getCumulativeVolume(mockDataForTimePeriod), [mockDataForTimePeriod])
 
-  const isSmallScreen = !useScreenSize()['sm']
+  const params = useMemo<{ data: StackedHistogramData[]; colors: [string, string]; headerHeight: number }>(
+    () => ({
+      data: entries,
+      colors: [theme.accent1, theme.accent3],
+      headerHeight: 85,
+      stale: dataQuality === DataQuality.STALE,
+    }),
+    [entries, dataQuality, theme.accent1, theme.accent3]
+  )
+
+  const cumulativeVolume = useMemo(() => getCumulativeVolume(entries), [entries])
   if (isSmallScreen) {
     return (
       <MinimalStatDisplay
@@ -127,35 +141,49 @@ function VolumeChartSection({ data }: { data: StackedBarsData[] }) {
           />
         </div>
       </RowBetween>
-      <StyledChart Model={StackedVolumeChartModel} params={params}>
-        {(crosshairData) => (
-          <ChartHeader
-            value={crosshairData ? getCumulativeSum(crosshairData) : getCumulativeVolume(mockDataForTimePeriod)}
-            time={crosshairData?.time}
-            timePlaceholder={getTimePeriodDisplay(timePeriod)}
-            protocolData={getVolumeProtocolInfo(crosshairData, EXPLORE_PRICE_SOURCES)}
-          />
-        )}
-      </StyledChart>
+      {(() => {
+        if (dataQuality === DataQuality.INVALID) {
+          const errorText = loading ? undefined : (
+            <Trans>Unable to display historical volume data for the current chain.</Trans>
+          )
+          return (
+            <ChartSkeleton hideYAxis type={ChartType.VOLUME} height={EXPLORE_CHART_HEIGHT_PX} errorText={errorText} />
+          )
+        }
+        return (
+          <StyledChart Model={CustomVolumeChartModel<StackedHistogramData>} params={params}>
+            {(crosshairData) => (
+              <ChartHeader
+                value={crosshairData ? getCumulativeSum(crosshairData) : getCumulativeVolume(entries)}
+                time={crosshairData?.time}
+                timePlaceholder={formatHistoryDuration(timeGranularityToHistoryDuration(timePeriod))}
+                protocolData={getVolumeProtocolInfo(crosshairData, EXPLORE_PRICE_SOURCES)}
+              />
+            )}
+          </StyledChart>
+        )
+      })()}
     </SectionContainer>
   )
 }
 
-function TVLChartSection({ data }: { data: StackedLineData[] }) {
+function TVLChartSection({ chainId }: { chainId: number }) {
   const theme = useTheme()
+
+  const { entries, loading, dataQuality } = useDailyProtocolTVL(chainIdToBackendName(chainId))
+  const lastEntry = entries[entries.length - 1]
   const params = useMemo(
     () => ({
-      data,
+      data: entries,
       colors: EXPLORE_PRICE_SOURCES?.map((source) => getProtocolColor(source, theme)) ?? [theme.accent1],
     }),
-    [data, theme]
+    [entries, theme]
   )
 
-  const lastEntry = data[data.length - 1]
   const isSmallScreen = !useScreenSize()['sm']
   if (isSmallScreen) {
     const currentTVL = lastEntry?.values.reduce((acc, curr) => acc + curr, 0)
-    return <MinimalStatDisplay title={<Trans>Uniswap TVL</Trans>} value={currentTVL} time={<Trans>All time</Trans>} />
+    return <MinimalStatDisplay title={<Trans>Uniswap TVL</Trans>} value={currentTVL} />
   }
 
   return (
@@ -163,41 +191,55 @@ function TVLChartSection({ data }: { data: StackedLineData[] }) {
       <SectionTitle>
         <Trans>Uniswap TVL</Trans>
       </SectionTitle>
-      <StyledChart Model={TVLChartModel} params={params}>
-        {(crosshairData) => (
-          <ChartHeader
-            value={(crosshairData ?? lastEntry)?.values.reduce((v, sum) => (sum += v), 0)}
-            time={crosshairData?.time}
-            protocolData={EXPLORE_PRICE_SOURCES?.map((source, index) => ({
-              protocol: source,
-              value: crosshairData?.values[index],
-            }))}
-          />
-        )}
-      </StyledChart>
+      {(() => {
+        if (dataQuality === DataQuality.INVALID) {
+          const errorText = loading ? undefined : (
+            <Trans>Unable to display historical TVL data for the current chain.</Trans>
+          )
+          return <ChartSkeleton hideYAxis type={ChartType.TVL} height={EXPLORE_CHART_HEIGHT_PX} errorText={errorText} />
+        }
+
+        return (
+          <StyledChart Model={TVLChartModel} params={params}>
+            {(crosshairData) => (
+              <ChartHeader
+                value={(crosshairData ?? lastEntry)?.values.reduce((v, sum) => (sum += v), 0)}
+                time={crosshairData?.time}
+                protocolData={EXPLORE_PRICE_SOURCES?.map((source, index) => ({
+                  protocol: source,
+                  value: crosshairData?.values[index],
+                }))}
+              />
+            )}
+          </StyledChart>
+        )
+      })()}
     </SectionContainer>
   )
 }
 
-function MinimalStatDisplay({ title, value, time }: { title: ReactNode; value: number; time: ReactNode }) {
+function MinimalStatDisplay({ title, value, time }: { title: ReactNode; value: number; time?: ReactNode }) {
   const { formatFiatPrice } = useFormatter()
 
   return (
     <SectionContainer>
       <SectionTitle color="neutral2">{title}</SectionTitle>
       <ThemedText.HeadlineSmall fontSize="24px" lineHeight="32px">
-        {formatFiatPrice({ price: value, type: NumberType.FiatTokenStatChartHeader })}
+        {formatFiatPrice({ price: value, type: NumberType.ChartFiatValue })}
       </ThemedText.HeadlineSmall>
-      <ThemedText.Caption color="neutral2">{time}</ThemedText.Caption>
+      {time && <ThemedText.Caption color="neutral2">{time}</ThemedText.Caption>}
     </SectionContainer>
   )
 }
 
 export function ExploreChartsSection() {
+  const currentChainName = validateUrlChainParam(useExploreParams().chainName)
+  const chainId = supportedChainIdFromGQLChain(currentChainName)
+
   return (
     <ChartsContainer>
-      <TVLChartSection data={HARDCODED_TVL_DATA} />
-      <VolumeChartSection data={HARDCODED_VOLUME_DATA} />
+      <TVLChartSection chainId={chainId} />
+      <VolumeChartSection chainId={chainId} />
     </ChartsContainer>
   )
 }

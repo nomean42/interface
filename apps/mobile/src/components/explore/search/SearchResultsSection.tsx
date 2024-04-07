@@ -2,51 +2,60 @@ import React, { useCallback, useMemo } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { FlatList, ListRenderItemInfo } from 'react-native'
 import { FadeIn, FadeOut } from 'react-native-reanimated'
+import { SearchResultsLoader } from 'src/components/explore/search/SearchResultsLoader'
+import { SectionHeaderText } from 'src/components/explore/search/SearchSectionHeader'
+import { useWalletSearchResults } from 'src/components/explore/search/hooks'
+import { SearchENSAddressItem } from 'src/components/explore/search/items/SearchENSAddressItem'
 import { SearchEtherscanItem } from 'src/components/explore/search/items/SearchEtherscanItem'
 import { SearchNFTCollectionItem } from 'src/components/explore/search/items/SearchNFTCollectionItem'
 import { SearchTokenItem } from 'src/components/explore/search/items/SearchTokenItem'
-import { SearchWalletItem } from 'src/components/explore/search/items/SearchWalletItem'
-import { SearchResultsLoader } from 'src/components/explore/search/SearchResultsLoader'
-import { SectionHeaderText } from 'src/components/explore/search/SearchSectionHeader'
+import { SearchUnitagItem } from 'src/components/explore/search/items/SearchUnitagItem'
+import { SearchWalletByAddressItem } from 'src/components/explore/search/items/SearchWalletByAddressItem'
 import {
   formatNFTCollectionSearchResults,
   formatTokenSearchResults,
   getSearchResultId,
 } from 'src/components/explore/search/utils'
-import { AnimatedFlex, Flex, Text } from 'ui/src'
+import { AnimatedFlex, Flex, Icons, Text } from 'ui/src'
+import {
+  SafetyLevel,
+  useExploreSearchQuery,
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
+import i18n from 'uniswap/src/i18n/i18n'
 import { logger } from 'utilities/src/logger/logger'
 import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
-import { ChainId, CHAIN_INFO } from 'wallet/src/constants/chains'
-import { SafetyLevel, useExploreSearchQuery } from 'wallet/src/data/__generated__/types-and-hooks'
-import { useENS } from 'wallet/src/features/ens/useENS'
+import { CHAIN_INFO, ChainId } from 'wallet/src/constants/chains'
 import { SearchContext } from 'wallet/src/features/search/SearchContext'
 import {
   NFTCollectionSearchResult,
   SearchResultType,
   TokenSearchResult,
-  WalletSearchResult,
 } from 'wallet/src/features/search/SearchResult'
-import { useIsSmartContractAddress } from 'wallet/src/features/transactions/transfer/hooks/useIsSmartContractAddress'
-import i18n from 'wallet/src/i18n/i18n'
 import { getValidAddress } from 'wallet/src/utils/addresses'
 import { SEARCH_RESULT_HEADER_KEY } from './constants'
 import { SearchResultOrHeader } from './types'
 
+const ICON_SIZE = '$icon.24'
+const ICON_COLOR = '$neutral2'
+
 const WalletHeaderItem: SearchResultOrHeader = {
+  icon: <Icons.Person color={ICON_COLOR} size={ICON_SIZE} />,
   type: SEARCH_RESULT_HEADER_KEY,
-  title: i18n.t('Wallets'),
+  title: i18n.t('explore.search.section.wallets'),
 }
 const TokenHeaderItem: SearchResultOrHeader = {
+  icon: <Icons.Coin color={ICON_COLOR} size={ICON_SIZE} />,
   type: SEARCH_RESULT_HEADER_KEY,
-  title: i18n.t('Tokens'),
+  title: i18n.t('explore.search.section.tokens'),
 }
 const NFTHeaderItem: SearchResultOrHeader = {
+  icon: <Icons.Gallery color={ICON_COLOR} size={ICON_SIZE} />,
   type: SEARCH_RESULT_HEADER_KEY,
-  title: i18n.t('NFT Collections'),
+  title: i18n.t('explore.search.section.nft'),
 }
 const EtherscanHeaderItem: SearchResultOrHeader = {
   type: SEARCH_RESULT_HEADER_KEY,
-  title: i18n.t('View on {{ blockExplorerName }}', {
+  title: i18n.t('explore.search.action.viewEtherscan', {
     blockExplorerName: CHAIN_INFO[ChainId.Mainnet].explorer.name,
   }),
 }
@@ -64,6 +73,10 @@ export function SearchResultsSection({ searchQuery }: { searchQuery: string }): 
     variables: { searchQuery, nftCollectionsFilter: { nameQuery: searchQuery } },
   })
 
+  const onRetry = useCallback(async () => {
+    await refetch()
+  }, [refetch])
+
   const tokenResults = useMemo<TokenSearchResult[] | undefined>(() => {
     if (!searchResultsData || !searchResultsData.searchTokens) {
       return
@@ -71,6 +84,8 @@ export function SearchResultsSection({ searchQuery }: { searchQuery: string }): 
 
     return formatTokenSearchResults(searchResultsData.searchTokens, searchQuery)
   }, [searchQuery, searchResultsData])
+
+  // Search for matching NFT collections
 
   const nftCollectionResults = useMemo<NFTCollectionSearchResult[] | undefined>(() => {
     if (!searchResultsData || !searchResultsData.nftCollections) {
@@ -80,58 +95,24 @@ export function SearchResultsSection({ searchQuery }: { searchQuery: string }): 
     return formatNFTCollectionSearchResults(searchResultsData.nftCollections)
   }, [searchResultsData])
 
-  // Search for matching ENS
+  // Search for matching wallets
+
   const {
-    address: ensAddress,
-    name: ensName,
-    loading: ensLoading,
-  } = useENS(ChainId.Mainnet, searchQuery, true)
+    wallets: walletSearchResults,
+    loading: walletsLoading,
+    exactENSMatch,
+    exactUnitagMatch,
+  } = useWalletSearchResults(searchQuery)
 
-  const validAddress: Address | null = getValidAddress(searchQuery, true, false)
-    ? searchQuery
-    : null
-
-  // Search for matching EOA wallet address
-  const { isSmartContractAddress, loading: loadingIsSmartContractAddress } =
-    useIsSmartContractAddress(validAddress ?? undefined, ChainId.Mainnet)
-
-  const walletsLoading = ensLoading || loadingIsSmartContractAddress
-
-  const onRetry = useCallback(async () => {
-    await refetch()
-  }, [refetch])
-
-  const hasENSResult = ensName && ensAddress
-  const hasEOAResult = validAddress && !isSmartContractAddress
-  const walletSearchResults: WalletSearchResult[] = useMemo(() => {
-    if (hasENSResult) {
-      return [
-        {
-          type: SearchResultType.Wallet,
-          address: ensAddress,
-          ensName,
-        },
-      ]
-    }
-    if (hasEOAResult) {
-      return [
-        {
-          type: SearchResultType.Wallet,
-          address: validAddress,
-        },
-      ]
-    }
-    return []
-  }, [ensAddress, ensName, hasENSResult, hasEOAResult, validAddress])
+  const validAddress: Address | undefined = useMemo(
+    () => getValidAddress(searchQuery, true, false) ?? undefined,
+    [searchQuery]
+  )
 
   const countTokenResults = tokenResults?.length ?? 0
   const countNftCollectionResults = nftCollectionResults?.length ?? 0
-  const countENSResults = hasENSResult || hasEOAResult ? 1 : 0
-  const countTotalResults = countTokenResults + countNftCollectionResults + countENSResults
-
-  // Only consider queries with the .eth suffix as an exact ENS match
-  const exactENSMatch =
-    ensName?.toLowerCase() === searchQuery.toLowerCase() && searchQuery.includes('.eth')
+  const countWalletResults = walletSearchResults.length
+  const countTotalResults = countTokenResults + countNftCollectionResults + countWalletResults
 
   const prefixTokenMatch = tokenResults?.find((res: TokenSearchResult) =>
     isPrefixTokenMatch(res, searchQuery)
@@ -146,7 +127,12 @@ export function SearchResultsSection({ searchQuery }: { searchQuery: string }): 
 
   const hasVerifiedNFTResults = Boolean(nftCollectionResults?.some((res) => res.isVerified))
 
-  const showWalletSectionFirst = exactENSMatch && !prefixTokenMatch
+  const isUsernameSearch = useMemo(() => {
+    return searchQuery.includes('.')
+  }, [searchQuery])
+
+  const showWalletSectionFirst =
+    isUsernameSearch && (exactUnitagMatch || (exactENSMatch && !prefixTokenMatch))
   const showNftCollectionsBeforeTokens = hasVerifiedNFTResults && !hasVerifiedTokenResults
 
   const sortedSearchResults: SearchResultOrHeader[] = useMemo(() => {
@@ -158,18 +144,17 @@ export function SearchResultsSection({ searchQuery }: { searchQuery: string }): 
     const walletsWithHeader =
       walletSearchResults.length > 0 ? [WalletHeaderItem, ...walletSearchResults] : []
 
-    // Rank token and nft results
-    const searchResultItems: SearchResultOrHeader[] = showNftCollectionsBeforeTokens
-      ? [...nftsWithHeader, ...tokensWithHeader]
-      : [...tokensWithHeader, ...nftsWithHeader]
+    let searchResultItems: SearchResultOrHeader[] = []
 
-    // Add wallet results at beginning or end
-    if (walletsWithHeader.length > 0) {
-      if (showWalletSectionFirst) {
-        searchResultItems.unshift(...walletsWithHeader)
-      } else {
-        searchResultItems.push(...walletsWithHeader)
-      }
+    if (showWalletSectionFirst) {
+      // Wallets first, then tokens, then NFTs
+      searchResultItems = [...walletsWithHeader, ...tokensWithHeader, ...nftsWithHeader]
+    } else if (showNftCollectionsBeforeTokens) {
+      // NFTs, then wallets, then tokens
+      searchResultItems = [...nftsWithHeader, ...walletsWithHeader, ...tokensWithHeader]
+    } else {
+      // Tokens, then NFTs, then wallets
+      searchResultItems = [...tokensWithHeader, ...nftsWithHeader, ...walletsWithHeader]
     }
 
     // Add etherscan items at end
@@ -198,8 +183,8 @@ export function SearchResultsSection({ searchQuery }: { searchQuery: string }): 
     return (
       <AnimatedFlex entering={FadeIn} exiting={FadeOut} pt="$spacing24">
         <BaseCard.ErrorState
-          retryButtonLabel="Retry"
-          title={t('Couldn’t load search results')}
+          retryButtonLabel="common.button.retry"
+          title={t('explore.search.error')}
           onRetry={onRetry}
         />
       </AnimatedFlex>
@@ -207,14 +192,16 @@ export function SearchResultsSection({ searchQuery }: { searchQuery: string }): 
   }
 
   return (
-    <Flex grow gap="$spacing8">
+    <Flex grow gap="$spacing8" pb="$spacing36">
       <FlatList
         ListEmptyComponent={
           <AnimatedFlex entering={FadeIn} exiting={FadeOut} gap="$spacing8" mx="$spacing8">
             <Text color="$neutral2" variant="body1">
-              <Trans t={t}>
-                No results found for <Text color="$neutral1">"{searchQuery}"</Text>
-              </Trans>
+              <Trans
+                components={{ highlight: <Text color="$neutral1" variant="body1" /> }}
+                i18nKey="explore.search.empty.full"
+                values={{ searchQuery }}
+              />
             </Text>
           </AnimatedFlex>
         }
@@ -255,12 +242,20 @@ export const renderSearchItem = ({
   switch (searchResult.type) {
     case SEARCH_RESULT_HEADER_KEY:
       return (
-        <SectionHeaderText mt={index === 0 ? '$none' : '$spacing8'} title={searchResult.title} />
+        <SectionHeaderText
+          icon={searchResult.icon}
+          mt={index === 0 ? '$none' : '$spacing8'}
+          title={searchResult.title}
+        />
       )
     case SearchResultType.Token:
       return <SearchTokenItem searchContext={searchContext} token={searchResult} />
-    case SearchResultType.Wallet:
-      return <SearchWalletItem searchContext={searchContext} wallet={searchResult} />
+    case SearchResultType.ENSAddress:
+      return <SearchENSAddressItem searchContext={searchContext} searchResult={searchResult} />
+    case SearchResultType.Unitag:
+      return <SearchUnitagItem searchContext={searchContext} searchResult={searchResult} />
+    case SearchResultType.WalletByAddress:
+      return <SearchWalletByAddressItem searchContext={searchContext} searchResult={searchResult} />
     case SearchResultType.NFTCollection:
       return <SearchNFTCollectionItem collection={searchResult} searchContext={searchContext} />
     case SearchResultType.Etherscan:

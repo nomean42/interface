@@ -3,8 +3,7 @@ import { Currency, CurrencyAmount, Percent, TradeType } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import { Pool } from '@uniswap/v3-sdk'
 import { useWeb3React } from '@web3-react/core'
-import { SUPPORTED_GAS_ESTIMATE_CHAIN_IDS } from 'constants/chains'
-import { L2_CHAIN_IDS } from 'constants/chains'
+import { L2_CHAIN_IDS, SUPPORTED_GAS_ESTIMATE_CHAIN_IDS } from 'constants/chains'
 import JSBI from 'jsbi'
 import useNativeCurrency from 'lib/hooks/useNativeCurrency'
 import { useMemo } from 'react'
@@ -80,17 +79,22 @@ export default function useClassicAutoSlippageTolerance(trade?: ClassicTrade): P
   const outputUSD = useUSDPrice(trade?.outputAmount)
   const outputDollarValue = useStablecoinAmountFromFiatValue(outputUSD.data)
 
-  const nativeGasPrice = useGasPrice()
-  const gasEstimate = guesstimateGas(trade)
-  const gasEstimateUSD = useStablecoinAmountFromFiatValue(trade?.gasUseEstimateUSD) ?? null
-  const nativeCurrency = useNativeCurrency(chainId)
+  // Prefer the USD estimate, if it is supported.
+  const supportsGasEstimate = useMemo(() => chainId && SUPPORTED_GAS_ESTIMATE_CHAIN_IDS.includes(chainId), [chainId])
+  const gasEstimateUSD =
+    useStablecoinAmountFromFiatValue(supportsGasEstimate ? trade?.gasUseEstimateUSD : undefined) ?? null
 
+  // Skip the gas estimate if we already have a USD estimate, or if there is no trade.
+  const skipNativeEstimate = Boolean(gasEstimateUSD || !trade)
+  const nativeGasPrice = useGasPrice(/* skip= */ skipNativeEstimate)
+  const nativeCurrency = useNativeCurrency(chainId)
+  const gasEstimate = guesstimateGas(trade)
   const nativeGasCost =
     nativeGasPrice && typeof gasEstimate === 'number'
       ? JSBI.multiply(nativeGasPrice, JSBI.BigInt(gasEstimate))
       : undefined
   const gasCostUSD = useUSDPrice(
-    trade && nativeCurrency && nativeGasCost ? CurrencyAmount.fromRawAmount(nativeCurrency, nativeGasCost) : undefined
+    nativeCurrency && nativeGasCost ? CurrencyAmount.fromRawAmount(nativeCurrency, nativeGasCost) : undefined
   )
   const gasCostStablecoinAmount = useStablecoinAmountFromFiatValue(gasCostUSD.data)
 

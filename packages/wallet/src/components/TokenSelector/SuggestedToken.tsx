@@ -1,6 +1,5 @@
-import { ImpactFeedbackStyle } from 'expo-haptics'
 import { memo } from 'react'
-import { TouchableArea, useSporeColors } from 'ui/src'
+import { ImpactFeedbackStyle, isWeb, TouchableArea, useSporeColors } from 'ui/src'
 import { iconSizes } from 'ui/src/theme'
 import { TokenLogo } from 'wallet/src/components/CurrencyLogo/TokenLogo'
 import { Pill } from 'wallet/src/components/text/Pill'
@@ -40,7 +39,7 @@ function _SuggestedToken({
         icon={
           <TokenLogo
             name={currency.name}
-            size={iconSizes.icon28}
+            size={isWeb ? iconSizes.icon24 : iconSizes.icon28}
             symbol={currency.symbol}
             url={logoUrl}
           />
@@ -51,7 +50,7 @@ function _SuggestedToken({
         pl="$spacing4"
         pr="$spacing12"
         py="$spacing4"
-        textVariant="body1"
+        textVariant={isWeb ? 'buttonLabel3' : 'body1'}
       />
     </TouchableArea>
   )

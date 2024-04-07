@@ -7,20 +7,22 @@ import { ButtonGray, ButtonPrimary, ButtonText } from 'components/Button'
 import { AutoColumn } from 'components/Column'
 import { FlyoutAlignment, Menu } from 'components/Menu'
 import PositionList from 'components/PositionList'
-import { RowBetween, RowFixed } from 'components/Row'
+import Row, { RowBetween, RowFixed } from 'components/Row'
 import { SwitchLocaleLink } from 'components/SwitchLocaleLink'
 import { isSupportedChain } from 'constants/chains'
 import { useFilterPossiblyMaliciousPositions } from 'hooks/useFilterPossiblyMaliciousPositions'
 import { useNetworkSupportsV2 } from 'hooks/useNetworkSupportsV2'
 import { useV3Positions } from 'hooks/useV3Positions'
+import { PoolVersionMenu } from 'pages/Pool/shared'
 import { useMemo } from 'react'
 import { AlertTriangle, BookOpen, ChevronDown, ChevronsRight, Inbox, Layers } from 'react-feather'
 import { Link } from 'react-router-dom'
+import { ApplicationModal } from 'state/application/reducer'
 import { useUserHideClosedPositions } from 'state/user/hooks'
 import styled, { css, useTheme } from 'styled-components'
 import { HideSmall, ThemedText } from 'theme/components'
 import { PositionDetails } from 'types/position'
-
+import { ProtocolVersion } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import CTACards from './CTACards'
 import { LoadingRows } from './styled'
 
@@ -165,7 +167,7 @@ function WrongNetworkCard() {
           <AutoColumn gap="lg" style={{ width: '100%' }}>
             <TitleRow padding="0">
               <ThemedText.H1Large>
-                <Trans>Pools</Trans>
+                <Trans>Positions</Trans>
               </ThemedText.H1Large>
             </TitleRow>
 
@@ -257,12 +259,16 @@ export default function Pool() {
         <AutoColumn gap="lg" justify="center">
           <AutoColumn gap="lg" style={{ width: '100%' }}>
             <TitleRow padding="0">
-              <ThemedText.LargeHeader>
-                <Trans>Pools</Trans>
-              </ThemedText.LargeHeader>
+              <Row gap="md" width="min-content">
+                <ThemedText.LargeHeader>
+                  <Trans>Positions</Trans>
+                </ThemedText.LargeHeader>
+                <PoolVersionMenu protocolVersion={ProtocolVersion.V3} />
+              </Row>
               <ButtonRow>
                 {networkSupportsV2 && (
                   <PoolMenu
+                    modal={ApplicationModal.POOL_OVERVIEW_OPTIONS}
                     menuItems={menuItems}
                     flyoutAlignment={FlyoutAlignment.LEFT}
                     ToggleUI={(props: any) => (

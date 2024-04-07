@@ -1,10 +1,11 @@
-import { forwardRef, useCallback, useState } from 'react'
+import { forwardRef, useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Keyboard,
   LayoutChangeEvent,
   NativeSyntheticEvent,
   TextInput as NativeTextInput,
+  Platform,
   TextInputFocusEventData,
 } from 'react-native'
 import {
@@ -17,12 +18,16 @@ import {
   SpaceTokens,
   Text,
   TouchableArea,
+  isWeb,
+  useComposedRefs,
   useDeviceDimensions,
 } from 'ui/src'
-import { fonts, spacing } from 'ui/src/theme'
+import { fonts, iconSizes, spacing } from 'ui/src/theme'
 import { SHADOW_OFFSET_SMALL } from 'wallet/src/components/BaseCard/BaseCard'
 import { sendWalletAnalyticsEvent } from 'wallet/src/telemetry'
 import { WalletEventName } from 'wallet/src/telemetry/constants'
+
+const DEFAULT_MIN_HEIGHT = 48
 
 export const springConfig = {
   stiffness: 1000,
@@ -35,43 +40,56 @@ export const springConfig = {
 
 export type SearchTextInputProps = InputProps & {
   onCancel?: () => void
+  onClose?: () => void
   clearIcon?: JSX.Element
   disableClearable?: boolean
   endAdornment?: JSX.Element | null
-  showCancelButton?: boolean
   showShadow?: boolean
   py?: SpaceTokens
+  px?: SpaceTokens
+  hideIcon?: boolean
+  minHeight?: number
 }
 
 export const SearchTextInput = forwardRef<NativeTextInput, SearchTextInputProps>(
+  // eslint-disable-next-line complexity
   function _SearchTextInput(props, ref) {
     const dimensions = useDeviceDimensions()
     const { t } = useTranslation()
     const {
       autoFocus,
-      backgroundColor,
+      backgroundColor = '$surface2',
       clearIcon,
-      disableClearable,
+      disableClearable = isWeb,
       endAdornment,
       onCancel,
+      onClose,
       onChangeText,
       onFocus,
       placeholder,
       py = '$spacing12',
-      showCancelButton,
+      px = '$spacing16',
       showShadow,
-      value = '',
+      value,
+      hideIcon,
+      minHeight = DEFAULT_MIN_HEIGHT,
     } = props
 
+    const inputRef = useRef<Input>(null)
+    const combinedRef = useComposedRefs<Input>(inputRef, ref)
+    const showCancelButton = !!onCancel
+    const showCloseButton = !!onClose
     const [isFocus, setIsFocus] = useState(false)
     const [cancelButtonWidth, setCancelButtonWidth] = useState(showCancelButton ? 40 : 0)
-    const [showClearButton, setShowClearButton] = useState(value.length > 0 && !disableClearable)
+    const [showClearButton, setShowClearButton] = useState(
+      value && value.length > 0 && !disableClearable
+    )
 
     const onPressCancel = (): void => {
       setIsFocus(false)
       setShowClearButton(false)
       Keyboard.dismiss()
-      sendWalletAnalyticsEvent(WalletEventName.ExploreSearchCancel, { query: value })
+      sendWalletAnalyticsEvent(WalletEventName.ExploreSearchCancel, { query: value || '' })
       onChangeText?.('')
       onCancel?.()
     }
@@ -81,6 +99,7 @@ export const SearchTextInput = forwardRef<NativeTextInput, SearchTextInputProps>
     }, [])
 
     const onClear = (): void => {
+      inputRef.current?.clear()
       onChangeText?.('')
       setShowClearButton(false)
     }
@@ -97,9 +116,9 @@ export const SearchTextInput = forwardRef<NativeTextInput, SearchTextInputProps>
     const onChangeTextInput = useCallback(
       (text: string) => {
         onChangeText?.(text)
-        setShowClearButton(text.length > 0)
+        setShowClearButton(text.length > 0 && !disableClearable)
       },
-      [onChangeText]
+      [disableClearable, onChangeText]
     )
 
     return (
@@ -111,12 +130,12 @@ export const SearchTextInput = forwardRef<NativeTextInput, SearchTextInputProps>
           alignItems="center"
           animateOnly={['marginRight']}
           animation="quick"
-          backgroundColor={backgroundColor ?? '$surface2'}
+          backgroundColor={backgroundColor}
           borderRadius="$roundedFull"
           gap="$spacing8"
-          marginRight={showCancelButton && isFocus ? cancelButtonWidth + spacing.spacing12 : 0}
-          minHeight={48}
-          px="$spacing16"
+          minHeight={minHeight}
+          mr={showCancelButton && isFocus ? cancelButtonWidth + spacing.spacing12 : 0}
+          px={px}
           py={py}
           {...(showShadow && {
             shadowColor: '$DEP_brandedAccentSoft',
@@ -128,14 +147,15 @@ export const SearchTextInput = forwardRef<NativeTextInput, SearchTextInputProps>
               shadowColor: '$sporeBlack',
             },
           })}>
-          <Flex py="$spacing4">
-            <Icons.Search color="$neutral2" size="$icon.20" />
-          </Flex>
+          {!hideIcon && (
+            <Flex py="$spacing4">
+              <Icons.Search color="$neutral2" size="$icon.20" />
+            </Flex>
+          )}
 
           <Flex grow alignSelf="stretch" mr="$spacing8" overflow="hidden">
             <Input
-              ref={ref}
-              ellipse
+              ref={combinedRef}
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus={autoFocus}
@@ -144,17 +164,29 @@ export const SearchTextInput = forwardRef<NativeTextInput, SearchTextInputProps>
               fontFamily="$body"
               height="100%"
               maxFontSizeMultiplier={fonts.body1.maxFontSizeMultiplier}
+              outlineColor="transparent"
+              outlineWidth={0}
               p="$none"
               placeholder={placeholder}
-              placeholderTextColor="$neutral2"
+              placeholderTextColor="$neutral3"
               position="absolute"
               returnKeyType="done"
               textContentType="none"
               top={0}
-              value={value}
-              // This fixes Android TextInput issue when the width is changed
+              // fix horizontal text wobble on iOS
+              {...(Platform.OS === 'ios' && {
+                width: '100%',
+              })}
+              // avoid turning into a controlled input if not wanting to
+              {...(typeof value !== 'undefined' && {
+                value,
+              })}
+              // fix Android TextInput issue when the width is changed
               // (the placeholder text was wrapping in 2 lines when the width was changed)
-              width={value ? undefined : 9999}
+              {...(Platform.OS === 'android' && {
+                width: value ? undefined : 9999,
+              })}
+              width="100%"
               onChangeText={onChangeTextInput}
               onFocus={onTextInputFocus}
               onSubmitEditing={onTextInputSubmitEditing}
@@ -164,14 +196,14 @@ export const SearchTextInput = forwardRef<NativeTextInput, SearchTextInputProps>
           <AnimatePresence>
             {showClearButton ? (
               <Button
+                // TODO(MOB-3059): tamagui should fix this internally and then we can remove animateOnly
+                animateOnly={['transform', 'opacity']}
                 animation="quick"
                 backgroundColor="$surface3"
                 borderRadius="$roundedFull"
-                // eslint-disable-next-line react-native/no-inline-styles
-                enterStyle={{ o: 0, scale: 0 }}
-                // eslint-disable-next-line react-native/no-inline-styles
-                exitStyle={{ o: 0, scale: 0 }}
-                icon={clearIcon ?? <Icons.X color="$neutral2" size="$icon.16" />}
+                enterStyle={{ opacity: 0, scale: 0 }}
+                exitStyle={{ opacity: 0, scale: 0 }}
+                icon={clearIcon ?? <Icons.X color="$neutral3" size="$icon.16" />}
                 p="$spacing4"
                 theme="secondary"
                 onPress={onClear}
@@ -185,19 +217,40 @@ export const SearchTextInput = forwardRef<NativeTextInput, SearchTextInputProps>
               </Flex>
             ) : null}
           </AnimatePresence>
+          <AnimatePresence>
+            {showCloseButton && (
+              <Button
+                animation="quick"
+                backgroundColor={backgroundColor}
+                enterStyle={{ opacity: 0, scale: 0 }}
+                exitStyle={{ opacity: 0, scale: 0 }}
+                icon={
+                  <Icons.RotatableChevron
+                    color="$neutral3"
+                    direction="up"
+                    height={iconSizes.icon20}
+                    width={iconSizes.icon20}
+                  />
+                }
+                p="$none"
+                theme="secondary"
+                onPress={onClose}
+              />
+            )}
+          </AnimatePresence>
         </Flex>
 
         {showCancelButton && (
           <Flex
             animation="200ms"
-            o={isFocus ? 1 : 0}
-            pos="absolute"
-            r={0}
+            opacity={isFocus ? 1 : 0}
+            position="absolute"
+            right={0}
             scale={isFocus ? 1 : 0}
             x={isFocus ? 0 : dimensions.fullWidth}
             onLayout={onCancelButtonLayout}>
             <TouchableArea hitSlop={16} onPress={onPressCancel}>
-              <Text variant="buttonLabel2">{t('Cancel')}</Text>
+              <Text variant="buttonLabel2">{t('common.button.cancel')}</Text>
             </TouchableArea>
           </Flex>
         )}

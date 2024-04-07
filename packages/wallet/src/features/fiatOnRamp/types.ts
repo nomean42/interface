@@ -1,3 +1,12 @@
+import {
+  FiatPurchaseTransactionInfo,
+  TransactionDetails,
+} from 'wallet/src/features/transactions/types'
+
+export type FiatOnRampTransactionDetails = TransactionDetails & {
+  typeInfo: FiatPurchaseTransactionInfo
+}
+
 export type FiatOnRampWidgetUrlQueryParameters = {
   colorCode: string
   externalTransactionId: string
@@ -159,4 +168,194 @@ export type MoonpayTransactionResponseItem = MoonpayQuote & {
     // Sometimes| the customer is required to take an action or actions to further the purchase process| usually by submitting information at a provided URL. For each action| we pass an object with a type and a url.
     actions: 'complete_bank_transfer' | 'retry_kyc' | 'verify_card_by_code' | 'verify_card_by_file'
   }>
+}
+
+export type FORCountry = {
+  countryCode: string
+  displayName: string
+  state: string | undefined
+}
+
+// /get-country
+
+export type FORGetCountryResponse = FORCountry
+
+// /supported-countries
+
+export type FORSupportedCountriesResponse = {
+  supportedCountries: FORCountry[]
+}
+
+// /quote
+
+export type FORQuoteRequest = {
+  countryCode: string
+  destinationCurrencyCode: string
+  sourceAmount: number
+  sourceCurrencyCode: string
+  walletAddress: string
+  state?: string
+}
+
+export type FORQuote = {
+  countryCode: string | null
+  sourceAmount: number
+  sourceCurrencyCode: string
+  destinationAmount: number
+  destinationCurrencyCode: string
+  serviceProvider: string
+  totalFee: number
+}
+
+export type FORQuoteResponse = {
+  quotes: Maybe<FORQuote[]>
+  message: string | null
+  error: string | null
+}
+
+// /service-providers
+
+export type FORLogo = {
+  darkLogo: string
+  lightLogo: string
+}
+
+export type FORServiceProvider = {
+  serviceProvider: string
+  name: string
+  url: string
+  logos: FORLogo
+  paymentMethods: string[]
+}
+
+export type FORServiceProvidersRequest = {
+  countryCode: string
+}
+
+export type FORServiceProvidersResponse = {
+  serviceProviders: FORServiceProvider[]
+}
+
+// /supported-tokens
+
+export type FORSupportedTokensRequest = {
+  fiatCurrency: string
+  countryCode: string
+}
+
+export type FORSupportedToken = {
+  cryptoCurrencyCode: string
+  displayName: string
+  address: string
+  cryptoCurrencyChain: string
+  chainId: string
+  symbol: string
+}
+
+export type FORSupportedTokensResponse = {
+  supportedTokens: FORSupportedToken[]
+}
+
+// /supported-fiat-currencies
+
+export type FORSupportedFiatCurrenciesRequest = {
+  countryCode: string
+}
+
+export type FORSupportedFiatCurrency = {
+  fiatCurrencyCode: string
+  displayName: string
+  symbol: string
+}
+
+export type FORSupportedFiatCurrenciesResponse = {
+  fiatCurrencies: FORSupportedFiatCurrency[]
+}
+
+// /transfer-institutions
+
+export type FORTransferInstitutionsRequest = {
+  countryCode: string
+}
+
+export type FORTransferInstitution = {
+  domain: string
+  id: string
+  icon: string
+  key: string
+  name: string
+  rank: number
+  subName: string
+}
+
+export type FORTransferInstitutionsResponse = {
+  institutions: FORTransferInstitution[]
+}
+
+// /widget-url
+
+export type FORWidgetUrlRequest = {
+  sourceAmount: number
+  sourceCurrencyCode: string
+  destinationCurrencyCode: string
+  countryCode: string
+  serviceProvider: string
+  walletAddress: string
+  externalSessionId: string
+  redirectUrl?: string
+}
+
+export type FORWidgetUrlResponse = {
+  id: string
+  widgetUrl: string
+}
+
+// /transfer-widget-url
+
+export type FORTransferWidgetUrlRequest = {
+  sourceAmount: number
+  sourceCurrencyCode: string
+  countryCode: string
+  institutionId: string
+  walletAddress: string
+  externalSessionId: string
+  redirectURL: string
+}
+
+// /transactions
+
+export type FORCryptoDetails = {
+  walletAddress: string
+  networkFee: number
+  transactionFee: number
+  totalFee: number
+  blockchainTransactionId: string
+  chainId: string
+}
+
+export type FORTransaction = {
+  id: string
+  status: string
+  sourceAmount: number
+  sourceCurrencyCode: string
+  destinationAmount: number
+  destinationCurrencyCode: string
+  serviceProvider: string
+  cryptoDetails: FORCryptoDetails
+  createdAt: string
+  updatedAt: string
+  externalSessionId: string
+}
+
+export type FORTransactionsRequest = {
+  limit?: number
+}
+
+export type FORTransactionsResponse = {
+  transactions: FORTransaction[]
+  count: number
+  remaining: number
+  totalCount: number
+  message: string | null
+  error: string | null
 }

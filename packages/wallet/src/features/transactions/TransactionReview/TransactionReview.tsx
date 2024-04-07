@@ -2,29 +2,21 @@ import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
 import { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FadeInUp, FadeOut } from 'react-native-reanimated'
-import {
-  AnimatedFlex,
-  Button,
-  Flex,
-  Text,
-  useDeviceDimensions,
-  useMedia,
-  useSporeColors,
-} from 'ui/src'
+import { AnimatedFlex, Button, Flex, Text, isWeb, useDeviceDimensions, useMedia } from 'ui/src'
+import { BackArrow } from 'ui/src/components/icons/BackArrow'
 import { fonts, iconSizes } from 'ui/src/theme'
+import { CurrencyInfo } from 'uniswap/src/features/dataApi/types'
 import { NumberType } from 'utilities/src/format/types'
+import { CurrencyLogo } from 'wallet/src/components/CurrencyLogo/CurrencyLogo'
+import { NFTTransfer } from 'wallet/src/components/NFT/NFTTransfer'
 import { AddressDisplay } from 'wallet/src/components/accounts/AddressDisplay'
 import { TransferArrowButton } from 'wallet/src/components/buttons/TransferArrowButton'
-import { CurrencyLogo } from 'wallet/src/components/CurrencyLogo/CurrencyLogo'
-import { Arrow } from 'wallet/src/components/icons/Arrow'
 import { AmountInput } from 'wallet/src/components/input/AmountInput'
 import { RecipientPrevTransfers } from 'wallet/src/components/input/RecipientInputPanel'
 import { TextInputProps } from 'wallet/src/components/input/TextInput'
-import { NFTTransfer } from 'wallet/src/components/NFT/NFTTransfer'
-import { CurrencyInfo } from 'wallet/src/features/dataApi/types'
 import { useLocalizationContext } from 'wallet/src/features/language/LocalizationContext'
 import { GQLNftAsset } from 'wallet/src/features/nfts/hooks'
-import { ElementNameType } from 'wallet/src/telemetry/constants'
+import { ElementName, ElementNameType } from 'wallet/src/telemetry/constants'
 import { getSymbolDisplayText } from 'wallet/src/utils/currency'
 
 interface BaseReviewProps {
@@ -76,7 +68,6 @@ export function TransactionReview({
   usdTokenEquivalentAmount,
   onPrev,
 }: TransactionReviewProps): JSX.Element {
-  const colors = useSporeColors()
   const media = useMedia()
   const { fullHeight } = useDeviceDimensions()
   const { t } = useTranslation()
@@ -118,14 +109,16 @@ export function TransactionReview({
         grow
         $short={{ gap: '$none' }}
         entering={FadeInUp}
-        exiting={FadeOut}
+        // TODO(EXT-526): re-enable `exiting` animation when it's fixed.
+        exiting={isWeb ? undefined : FadeOut}
         gap="$spacing4">
         {currencyInInfo ? (
           <Flex centered gap={innerGap}>
             <Flex centered gap={amountAndEquivalentValueGap}>
               {recipient && (
                 <Text color="$neutral2" variant="body1">
-                  {t('Sending')}
+                  {/* TODO gary to come back and fix this later. More complicated with nested components */}
+                  {t('send.review.summary.sending')}
                 </Text>
               )}
               <AmountInput
@@ -164,9 +157,9 @@ export function TransactionReview({
         ) : null}
         <TransferArrowButton
           disabled
-          bg="$transparent"
+          backgroundColor="$transparent"
           borderColor="$transparent"
-          padding={arrowPadding}
+          p={arrowPadding}
         />
         {currencyOutInfo && formattedAmountOut ? (
           <Flex centered $short={{ pb: '$spacing4' }} gap={innerGap} pb="$none">
@@ -181,7 +174,7 @@ export function TransactionReview({
                 py="$none"
                 showCurrencySign={isFiatInput}
                 showSoftInputOnFocus={false}
-                testID="amount-input-out"
+                testID={ElementName.AmountInputOut}
                 textAlign="center"
                 value={formattedAmountOut}
               />
@@ -196,7 +189,8 @@ export function TransactionReview({
         ) : recipient ? (
           <Flex centered gap="$spacing12">
             <Text color="$neutral2" variant="body1">
-              {t('To')}
+              {/* TODO gary to come back and fix this later. More complicated with nested components */}
+              {t('send.review.summary.to')}
             </Text>
             <Flex centered gap="$spacing8">
               <AddressDisplay
@@ -212,17 +206,13 @@ export function TransactionReview({
       </AnimatedFlex>
       <AnimatedFlex
         entering={FadeInUp}
-        exiting={FadeOut}
+        // TODO(EXT-526): re-enable `exiting` animation when it's fixed.
+        exiting={isWeb ? undefined : FadeOut}
         gap="$spacing12"
         justifyContent="flex-end">
         {transactionDetails}
         <Flex row gap="$spacing8">
-          <Button
-            icon={<Arrow color={colors.neutral1.val} direction="w" size={iconSizes.icon24} />}
-            size="large"
-            theme="tertiary"
-            onPress={onPrev}
-          />
+          <Button icon={<BackArrow />} size="large" theme="tertiary" onPress={onPrev} />
           <Button
             fill
             disabled={actionButtonProps.disabled}

@@ -4,7 +4,6 @@ exports[`AccountSwitcher renders correctly 1`] = `
 <View
   style={
     {
-      "alignItems": "stretch",
       "flexDirection": "column",
       "maxHeight": NaN,
       "paddingBottom": 12,
@@ -14,7 +13,6 @@ exports[`AccountSwitcher renders correctly 1`] = `
   <View
     style={
       {
-        "alignItems": "stretch",
         "flexDirection": "column",
         "gap": 16,
         "paddingBottom": 16,
@@ -27,6 +25,7 @@ exports[`AccountSwitcher renders correctly 1`] = `
         {
           "alignItems": "center",
           "flexDirection": "column",
+          "flexShrink": 1,
           "gap": 8,
         }
       }
@@ -34,7 +33,6 @@ exports[`AccountSwitcher renders correctly 1`] = `
       <View
         style={
           {
-            "alignItems": "stretch",
             "backgroundColor": "transparent",
             "borderBottomColor": "transparent",
             "borderBottomLeftRadius": 999999,
@@ -53,6 +51,7 @@ exports[`AccountSwitcher renders correctly 1`] = `
             "position": "relative",
           }
         }
+        testID="account-icon"
       >
         <View
           style={
@@ -76,7 +75,6 @@ exports[`AccountSwitcher renders correctly 1`] = `
           <View
             style={
               {
-                "alignItems": "stretch",
                 "flexDirection": "column",
                 "height": 56,
                 "width": 56,
@@ -86,7 +84,6 @@ exports[`AccountSwitcher renders correctly 1`] = `
             <View
               style={
                 {
-                  "alignItems": "stretch",
                   "flexDirection": "column",
                   "height": 56,
                   "width": 56,
@@ -256,6 +253,7 @@ exports[`AccountSwitcher renders correctly 1`] = `
             <Text
               adjustsFontSizeToFit={true}
               allowFontScaling={true}
+              ellipsizeMode="tail"
               maxFontSizeMultiplier={1.4}
               numberOfLines={1}
               style={
@@ -275,37 +273,27 @@ exports[`AccountSwitcher renders correctly 1`] = `
           </View>
         </View>
         <View
-          accessibilityState={
-            {
-              "busy": undefined,
-              "checked": undefined,
-              "disabled": undefined,
-              "expanded": undefined,
-              "selected": undefined,
-            }
-          }
-          accessibilityValue={
-            {
-              "max": undefined,
-              "min": undefined,
-              "now": undefined,
-              "text": undefined,
-            }
-          }
-          accessible={true}
-          collapsable={false}
+          cancelable={true}
+          disabled={false}
           focusable={true}
-          hitSlop={16}
-          onClick={[Function]}
-          onResponderGrant={[Function]}
-          onResponderMove={[Function]}
-          onResponderRelease={[Function]}
-          onResponderTerminate={[Function]}
-          onResponderTerminationRequest={[Function]}
-          onStartShouldSetResponder={[Function]}
+          hitSlop={[Function]}
+          minPressDuration={0}
+          onBlur={[Function]}
+          onFocus={[Function]}
+          onMouseEnter={[Function]}
+          onMouseLeave={[Function]}
+          onPress={[Function]}
+          onPressIn={[Function]}
+          onPressOut={[Function]}
           style={
             {
+              "flexDirection": "column",
               "opacity": 1,
+              "transform": [
+                {
+                  "scale": 1,
+                },
+              ],
             }
           }
           testID="copy"
@@ -409,7 +397,6 @@ exports[`AccountSwitcher renders correctly 1`] = `
     <View
       style={
         {
-          "alignItems": "stretch",
           "flexDirection": "column",
           "paddingLeft": 24,
           "paddingRight": 24,
@@ -418,6 +405,7 @@ exports[`AccountSwitcher renders correctly 1`] = `
     >
       <View
         cancelable={true}
+        disabled={false}
         focusable={true}
         minPressDuration={0}
         onBlur={[Function]}
@@ -432,8 +420,8 @@ exports[`AccountSwitcher renders correctly 1`] = `
             "alignItems": "center",
             "backgroundColor": "#F9F9F9",
             "borderBottomColor": "transparent",
-            "borderBottomLeftRadius": 8,
-            "borderBottomRightRadius": 8,
+            "borderBottomLeftRadius": 12,
+            "borderBottomRightRadius": 12,
             "borderBottomWidth": 1,
             "borderLeftColor": "transparent",
             "borderLeftWidth": 1,
@@ -441,8 +429,8 @@ exports[`AccountSwitcher renders correctly 1`] = `
             "borderRightWidth": 1,
             "borderStyle": "solid",
             "borderTopColor": "transparent",
-            "borderTopLeftRadius": 8,
-            "borderTopRightRadius": 8,
+            "borderTopLeftRadius": 12,
+            "borderTopRightRadius": 12,
             "borderTopWidth": 1,
             "flexDirection": "row",
             "gap": 4,
@@ -478,7 +466,6 @@ exports[`AccountSwitcher renders correctly 1`] = `
   <View
     style={
       {
-        "alignItems": "stretch",
         "flexDirection": "column",
         "flexShrink": 1,
       }
@@ -526,45 +513,28 @@ exports[`AccountSwitcher renders correctly 1`] = `
     ExpoLinearGradient
   </View>
   <View
-    accessibilityState={
-      {
-        "busy": undefined,
-        "checked": undefined,
-        "disabled": undefined,
-        "expanded": undefined,
-        "selected": undefined,
-      }
-    }
-    accessibilityValue={
-      {
-        "max": undefined,
-        "min": undefined,
-        "now": undefined,
-        "text": undefined,
-      }
-    }
-    accessible={true}
-    collapsable={false}
+    cancelable={true}
+    disabled={false}
     focusable={true}
-    hitSlop={
-      {
-        "bottom": 5,
-        "left": 5,
-        "right": 5,
-        "top": 5,
-      }
-    }
-    onClick={[Function]}
-    onResponderGrant={[Function]}
-    onResponderMove={[Function]}
-    onResponderRelease={[Function]}
-    onResponderTerminate={[Function]}
-    onResponderTerminationRequest={[Function]}
-    onStartShouldSetResponder={[Function]}
+    hitSlop={[Function]}
+    minPressDuration={0}
+    onBlur={[Function]}
+    onFocus={[Function]}
+    onMouseEnter={[Function]}
+    onMouseLeave={[Function]}
+    onPress={[Function]}
+    onPressIn={[Function]}
+    onPressOut={[Function]}
     style={
       {
+        "flexDirection": "column",
         "marginTop": 16,
         "opacity": 1,
+        "transform": [
+          {
+            "scale": 1,
+          },
+        ],
       }
     }
   >
@@ -581,7 +551,6 @@ exports[`AccountSwitcher renders correctly 1`] = `
       <View
         style={
           {
-            "alignItems": "stretch",
             "borderBottomColor": "#2222220D",
             "borderBottomLeftRadius": 999999,
             "borderBottomRightRadius": 999999,

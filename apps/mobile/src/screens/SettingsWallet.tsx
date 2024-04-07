@@ -11,34 +11,36 @@ import {
   SettingsStackNavigationProp,
   SettingsStackParamList,
 } from 'src/app/navigation/types'
-import { BackHeader } from 'src/components/layout/BackHeader'
-import { Screen } from 'src/components/layout/Screen'
 import {
   SettingsRow,
   SettingsSection,
   SettingsSectionItem,
   SettingsSectionItemComponent,
 } from 'src/components/Settings/SettingsRow'
+import { BackHeader } from 'src/components/layout/BackHeader'
+import { Screen } from 'src/components/layout/Screen'
 import { openModal } from 'src/features/modals/modalSlice'
+import { promptPushPermission } from 'src/features/notifications/Onesignal'
 import {
   NotificationPermission,
   useNotificationOSPermissionsEnabled,
 } from 'src/features/notifications/hooks/useNotificationOSPermissionsEnabled'
-import { promptPushPermission } from 'src/features/notifications/Onesignal'
+import { sendMobileAnalyticsEvent } from 'src/features/telemetry'
+import { MobileEventName } from 'src/features/telemetry/constants'
 import { showNotificationSettingsAlert } from 'src/screens/Onboarding/NotificationsSetupScreen'
 import { Screens, UnitagScreens } from 'src/screens/Screens'
 import { Button, Flex, Text, useSporeColors } from 'ui/src'
 import NotificationIcon from 'ui/src/assets/icons/bell.svg'
 import GlobalIcon from 'ui/src/assets/icons/global.svg'
 import TextEditIcon from 'ui/src/assets/icons/textEdit.svg'
-import { iconSizes } from 'ui/src/theme'
+import { iconSizes, spacing } from 'ui/src/theme'
+import { FeatureFlags } from 'uniswap/src/features/experiments/flags'
+import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
 import { AddressDisplay } from 'wallet/src/components/accounts/AddressDisplay'
 import { Switch } from 'wallet/src/components/buttons/Switch'
 import { ChainId } from 'wallet/src/constants/chains'
 import { useENS } from 'wallet/src/features/ens/useENS'
-import { FEATURE_FLAGS } from 'wallet/src/features/experiments/constants'
-import { useFeatureFlag } from 'wallet/src/features/experiments/hooks'
-import { useUnitag } from 'wallet/src/features/unitags/hooks'
+import { useUnitagByAddress } from 'wallet/src/features/unitags/hooks'
 import {
   EditAccountAction,
   editAccountActions,
@@ -48,6 +50,9 @@ import { useAccounts, useSelectAccountNotificationSetting } from 'wallet/src/fea
 import { ElementName, ModalName } from 'wallet/src/telemetry/constants'
 
 type Props = NativeStackScreenProps<SettingsStackParamList, Screens.SettingsWallet>
+
+// Specific design request not in standard sizing type
+const UNICON_ICON_SIZE = 56
 
 export function SettingsWallet({
   route: {
@@ -60,6 +65,7 @@ export function SettingsWallet({
   const addressToAccount = useAccounts()
   const currentAccount = addressToAccount[address]
   const ensName = useENS(ChainId.Mainnet, address)?.name
+  const { unitag } = useUnitagByAddress(address)
   const readonly = currentAccount?.type === AccountType.Readonly
   const navigation = useNavigation<SettingsStackNavigationProp & OnboardingStackNavigationProp>()
 
@@ -68,7 +74,9 @@ export function SettingsWallet({
   const [notificationSwitchEnabled, setNotificationSwitchEnabled] = useState<boolean>(
     notificationsEnabledOnFirebase
   )
-  const unitagsFeatureFlagEnabled = useFeatureFlag(FEATURE_FLAGS.Unitags)
+  const unitagsFeatureFlagEnabled = useFeatureFlag(FeatureFlags.Unitags)
+
+  const showEditProfile = unitagsFeatureFlagEnabled && !readonly
 
   useEffect(() => {
     // If the user deletes the account while on this screen, go back
@@ -90,6 +98,7 @@ export function SettingsWallet({
   )
 
   const onChangeNotificationSettings = (enabled: boolean): void => {
+    sendMobileAnalyticsEvent(MobileEventName.NotificationsToggled, { enabled })
     if (notificationOSPermission === NotificationPermission.Enabled) {
       dispatch(
         editAccountActions.trigger({
@@ -124,17 +133,17 @@ export function SettingsWallet({
 
   const editNicknameSectionOption: SettingsSectionItem = {
     screen: Screens.SettingsWalletEdit,
-    text: t('Nickname'),
+    text: t('settings.setting.wallet.label'),
     icon: <TextEditIcon fill={colors.neutral2.get()} {...iconProps} />,
     screenProps: { address },
-    isHidden: !!ensName,
+    isHidden: !!ensName || !!unitag?.username,
   }
 
   const sections: SettingsSection[] = [
     {
-      subTitle: t('Wallet preferences'),
+      subTitle: t('settings.setting.wallet.preferences.title'),
       data: [
-        ...(unitagsFeatureFlagEnabled ? [] : [editNicknameSectionOption]),
+        ...(showEditProfile ? [] : [editNicknameSectionOption]),
         {
           action: (
             <Switch
@@ -143,12 +152,12 @@ export function SettingsWallet({
               onValueChange={onChangeNotificationSettings}
             />
           ),
-          text: t('Notifications'),
+          text: t('settings.setting.wallet.notifications.title'),
           icon: <NotificationIcon {...iconProps} />,
         },
         {
           screen: Screens.SettingsWalletManageConnection,
-          text: t('Manage connections'),
+          text: t('settings.setting.wallet.connections.title'),
           icon: <GlobalIcon {...iconProps} />,
           screenProps: { address },
           isHidden: readonly,
@@ -198,13 +207,13 @@ export function SettingsWallet({
           <SectionList
             ItemSeparatorComponent={renderItemSeparator}
             ListHeaderComponent={
-              unitagsFeatureFlagEnabled ? <AddressDisplayHeader address={address} /> : undefined
+              showEditProfile ? <AddressDisplayHeader address={address} /> : undefined
             }
             keyExtractor={(_item, index): string => 'wallet_settings' + index}
             renderItem={renderItem}
             renderSectionFooter={(): JSX.Element => <Flex pt="$spacing24" />}
             renderSectionHeader={({ section: { subTitle } }): JSX.Element => (
-              <Flex bg="$surface1" pb="$spacing12">
+              <Flex backgroundColor="$surface1" pb="$spacing12">
                 <Text color="$neutral2" variant="body1">
                   {subTitle}
                 </Text>
@@ -216,7 +225,7 @@ export function SettingsWallet({
           />
         </Flex>
         <Button testID={ElementName.Remove} theme="detrimental" onPress={onRemoveWallet}>
-          {t('Remove wallet')}
+          {t('settings.setting.wallet.action.remove')}
         </Button>
       </Flex>
     </Screen>
@@ -228,7 +237,7 @@ const renderItemSeparator = (): JSX.Element => <Flex pt="$spacing8" />
 function AddressDisplayHeader({ address }: { address: Address }): JSX.Element {
   const { t } = useTranslation()
   const ensName = useENS(ChainId.Mainnet, address)?.name
-  const { unitag } = useUnitag(address)
+  const { unitag } = useUnitagByAddress(address)
 
   const onPressEditProfile = (): void => {
     if (unitag?.username) {
@@ -248,12 +257,14 @@ function AddressDisplayHeader({ address }: { address: Address }): JSX.Element {
   }
 
   return (
-    <Flex gap="$spacing12" justifyContent="flex-start" pb="$spacing16">
+    <Flex gap="$spacing12" justifyContent="flex-start" pb="$spacing24">
       <Flex shrink>
         <AddressDisplay
           address={address}
           captionVariant="subheading2"
-          size={iconSizes.icon40}
+          gapBetweenLines={spacing.spacing4}
+          showIconBackground={true}
+          size={UNICON_ICON_SIZE}
           variant="body1"
         />
       </Flex>
@@ -262,9 +273,11 @@ function AddressDisplayHeader({ address }: { address: Address }): JSX.Element {
           color="$neutral1"
           fontSize="$small"
           size="medium"
-          theme="tertiary"
+          theme="secondary_Button"
           onPress={onPressEditProfile}>
-          {unitag ? t('Edit profile') : t('Edit label')}
+          {unitag?.username
+            ? t('settings.setting.wallet.action.editProfile')
+            : t('settings.setting.wallet.action.editLabel')}
         </Button>
       )}
     </Flex>

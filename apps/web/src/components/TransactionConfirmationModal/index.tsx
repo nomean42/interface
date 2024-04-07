@@ -10,8 +10,7 @@ import { ReactNode, useCallback, useState } from 'react'
 import { AlertCircle, ArrowUpCircle, CheckCircle } from 'react-feather'
 import { useIsTransactionConfirmed, useTransaction } from 'state/transactions/hooks'
 import styled, { useTheme } from 'styled-components'
-import { ExternalLink, ThemedText } from 'theme/components'
-import { CloseIcon, CustomLightSpinner } from 'theme/components'
+import { CloseIcon, CustomLightSpinner, ExternalLink, ThemedText } from 'theme/components'
 import { isL2ChainId } from 'utils/chains'
 import { ExplorerDataType, getExplorerLink } from 'utils/getExplorerLink'
 
@@ -287,9 +286,7 @@ function L2Content({
             )}
           </ThemedText.SubHeaderSmall>
           <ButtonPrimary onClick={onDismiss} style={{ margin: '4px 0 0 0' }}>
-            <ThemedText.SubHeaderLarge>
-              {inline ? <Trans>Return</Trans> : <Trans>Close</Trans>}
-            </ThemedText.SubHeaderLarge>
+            {inline ? <Trans>Return</Trans> : <Trans>Close</Trans>}
           </ButtonPrimary>
         </AutoColumn>
       </AutoColumn>

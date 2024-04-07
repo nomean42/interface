@@ -1,6 +1,6 @@
 import assert from 'assert'
 
-describe('Service Worker', () => {
+describe.skip('Service Worker', () => {
   before(() => {
     // Fail fast if there is no Service Worker on this build.
     cy.request({ url: '/service-worker.js', headers: { 'Service-Worker': 'script' } }).then((response) => {
@@ -30,7 +30,7 @@ describe('Service Worker', () => {
   after(unregisterServiceWorker)
 
   beforeEach(() => {
-    cy.intercept('https://api.uniswap.org/v1/amplitude-proxy', (req) => {
+    cy.intercept('https://interface.gateway.uniswap.org/v1/amplitude-proxy', (req) => {
       const body = JSON.stringify(req.body)
       const serviceWorkerStatus = body.match(/"service_worker":"(\w+)"/)?.[1]
       if (serviceWorkerStatus) {

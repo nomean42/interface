@@ -1,19 +1,18 @@
 import Column from 'components/Column'
 import FilterButton from 'components/DropdownSelector/FilterButton'
-import { MOBILE_MEDIA_BREAKPOINT } from 'components/Tokens/constants'
-import { useInfoExplorePageEnabled } from 'featureFlags/flags/infoExplore'
+import { MouseoverTooltip, TooltipSize } from 'components/Tooltip'
 import { useOnClickOutside } from 'hooks/useOnClickOutside'
-import { useRef } from 'react'
-import { ChevronDown, ChevronUp } from 'react-feather'
-import { useModalIsOpen, useToggleModal } from 'state/application/hooks'
-import { ApplicationModal } from 'state/application/reducer'
+import React, { useRef } from 'react'
+import { ChevronDown } from 'react-feather'
 import styled, { css } from 'styled-components'
+import { dropdownSlideDown } from 'theme/styles'
 import { Z_INDEX } from 'theme/zIndex'
 
 export const InternalMenuItem = styled.div<{ disabled?: boolean }>`
   display: flex;
   flex: 1;
   padding: 12px 8px;
+  gap: 12px;
   color: ${({ theme }) => theme.neutral1};
   align-items: center;
   justify-content: space-between;
@@ -32,7 +31,7 @@ export const InternalMenuItem = styled.div<{ disabled?: boolean }>`
       pointer-events: none;
     `}
 `
-const MenuFlyout = styled(Column)<{ isInfoExplorePageEnabled: boolean; menuFlyoutCss?: string }>`
+const MenuFlyout = styled(Column)<{ menuFlyoutCss?: string }>`
   min-width: 150px;
   overflow: auto;
   background-color: ${({ theme }) => theme.surface1};
@@ -44,6 +43,7 @@ const MenuFlyout = styled(Column)<{ isInfoExplorePageEnabled: boolean; menuFlyou
   position: absolute;
   top: 48px;
   z-index: ${Z_INDEX.dropdown};
+  ${dropdownSlideDown}
 
   scrollbar-width: thin;
   scrollbar-color: ${({ theme }) => `${theme.surface3} transparent`};
@@ -59,24 +59,32 @@ const MenuFlyout = styled(Column)<{ isInfoExplorePageEnabled: boolean; menuFlyou
     border-radius: 8px;
   }
 
+  @media screen and (max-width: ${({ theme }) => theme.breakpoint.xs}px) {
+    position: fixed;
+    top: unset;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    padding: 12px 16px;
+    background: ${({ theme }) => theme.surface2};
+    border: ${({ theme }) => `1px solid ${theme.surface3}`};
+    border-radius: 12px 12px 0 0;
+    z-index: ${Z_INDEX.modal};
+    animation: none;
+  }
+
   ${({ menuFlyoutCss }) => menuFlyoutCss}
 `
-const StyledMenu = styled.div<{ isInfoExplorePageEnabled: boolean }>`
+const StyledMenu = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
   position: relative;
   border: none;
   text-align: left;
-  ${({ isInfoExplorePageEnabled }) =>
-    !isInfoExplorePageEnabled &&
-    css`
-      @media only screen and (max-width: ${MOBILE_MEDIA_BREAKPOINT}) {
-        width: 72px;
-      }
-    `}
+  width: 100%;
 `
-const StyledMenuContent = styled.div<{ isInfoExplorePageEnabled: boolean }>`
+export const StyledMenuContent = styled.div`
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -85,63 +93,74 @@ const StyledMenuContent = styled.div<{ isInfoExplorePageEnabled: boolean }>`
   font-weight: 535;
   width: 100%;
   vertical-align: middle;
-  ${({ isInfoExplorePageEnabled }) => isInfoExplorePageEnabled && 'white-space: nowrap;'}
+  white-space: nowrap;
 `
 const Chevron = styled.span<{ open: boolean }>`
-  padding-top: 1px;
+  display: flex;
   color: ${({ open, theme }) => (open ? theme.neutral1 : theme.neutral2)};
+  rotate: ${({ open }) => (open ? '180deg' : '0deg')};
+  transition: rotate ${({ theme }) => `${theme.transition.duration.fast} ${theme.transition.timing.inOut}`};
 `
-const StyledFilterButton = styled(FilterButton)<{ isInfoExplorePageEnabled: boolean; buttonCss?: string }>`
+const StyledFilterButton = styled(FilterButton)<{ buttonCss?: string }>`
   ${({ buttonCss }) => buttonCss}
 `
 
 interface DropdownSelectorProps {
-  modal: ApplicationModal
+  isOpen: boolean
+  toggleOpen: React.DispatchWithoutAction
   menuLabel: JSX.Element
   internalMenuItems: JSX.Element
   dataTestId?: string
+  optionsContainerTestId?: string
+  tooltipText?: string
+  hideChevron?: boolean
   buttonCss?: any
   menuFlyoutCss?: any
 }
 
 export function DropdownSelector({
-  modal,
+  isOpen,
+  toggleOpen,
   menuLabel,
   internalMenuItems,
   dataTestId,
+  optionsContainerTestId,
+  tooltipText,
+  hideChevron,
   buttonCss,
   menuFlyoutCss,
 }: DropdownSelectorProps) {
   const node = useRef<HTMLDivElement | null>(null)
-  const open = useModalIsOpen(modal)
-  const toggleMenu = useToggleModal(modal)
-  useOnClickOutside(node, open ? toggleMenu : undefined)
-
-  const isInfoExplorePageEnabled = useInfoExplorePageEnabled()
+  useOnClickOutside(node, isOpen ? toggleOpen : undefined)
 
   return (
-    <StyledMenu isInfoExplorePageEnabled={isInfoExplorePageEnabled} ref={node}>
-      <StyledFilterButton
-        isInfoExplorePageEnabled={isInfoExplorePageEnabled}
-        onClick={toggleMenu}
-        active={open}
-        aria-label={dataTestId}
-        data-testid={dataTestId}
-        buttonCss={buttonCss}
+    <StyledMenu ref={node}>
+      <MouseoverTooltip
+        disabled={!tooltipText}
+        text={tooltipText}
+        size={TooltipSize.Max}
+        placement="top"
+        style={{ width: '100%' }}
       >
-        <StyledMenuContent isInfoExplorePageEnabled={isInfoExplorePageEnabled}>
-          {menuLabel}
-          <Chevron open={open}>
-            {open ? (
-              <ChevronUp width={20} height={15} viewBox="0 0 24 20" />
-            ) : (
-              <ChevronDown width={20} height={15} viewBox="0 0 24 20" />
+        <StyledFilterButton
+          onClick={toggleOpen}
+          active={isOpen}
+          aria-label={dataTestId}
+          data-testid={dataTestId}
+          buttonCss={buttonCss}
+        >
+          <StyledMenuContent>
+            {menuLabel}
+            {!hideChevron && (
+              <Chevron open={isOpen}>
+                <ChevronDown width={20} height={20} />
+              </Chevron>
             )}
-          </Chevron>
-        </StyledMenuContent>
-      </StyledFilterButton>
-      {open && (
-        <MenuFlyout isInfoExplorePageEnabled={isInfoExplorePageEnabled} menuFlyoutCss={menuFlyoutCss}>
+          </StyledMenuContent>
+        </StyledFilterButton>
+      </MouseoverTooltip>
+      {isOpen && (
+        <MenuFlyout data-testid={optionsContainerTestId} menuFlyoutCss={menuFlyoutCss}>
           {internalMenuItems}
         </MenuFlyout>
       )}

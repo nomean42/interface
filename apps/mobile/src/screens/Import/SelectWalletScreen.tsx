@@ -4,15 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { ScrollView } from 'react-native-gesture-handler'
 import { useAppDispatch } from 'src/app/hooks'
 import { OnboardingStackParamList } from 'src/app/navigation/types'
-import { Loader } from 'src/components/loading'
-import WalletPreviewCard from 'src/features/import/WalletPreviewCard'
 import { OnboardingScreen } from 'src/features/onboarding/OnboardingScreen'
 import { OnboardingScreens } from 'src/screens/Screens'
-import { Button, Flex } from 'ui/src'
+import { Button, Flex, Loader } from 'ui/src'
+import { useSelectWalletScreenQuery } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import { ONE_SECOND_MS } from 'utilities/src/time/time'
 import { useTimeout } from 'utilities/src/time/timing'
 import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
-import { useSelectWalletScreenQuery } from 'wallet/src/data/__generated__/types-and-hooks'
+import WalletPreviewCard from 'wallet/src/components/WalletPreviewCard/WalletPreviewCard'
 import { ImportType } from 'wallet/src/features/onboarding/types'
 import {
   EditAccountAction,
@@ -172,7 +171,7 @@ export function SelectWalletScreen({ navigation, route: { params } }: Props): JS
             editAccountActions.trigger({
               type: EditAccountAction.Rename,
               address,
-              newName: t('Wallet {{ number }}', { number: account.derivationIndex + 1 }),
+              newName: t('onboarding.wallet.defaultName', { number: account.derivationIndex + 1 }),
             })
           )
         }
@@ -196,12 +195,10 @@ export function SelectWalletScreen({ navigation, route: { params } }: Props): JS
   const isLoading = loading || isForcedLoading || isImportingAccounts
 
   const title = isLoading
-    ? t('Searching for wallets')
-    : isOnlyOneAccount
-    ? t('One wallet found')
-    : t('Select wallets to import')
+    ? t('account.wallet.select.loading.title')
+    : t('account.wallet.select.title_one', { count: initialShownAccounts?.length ?? 0 })
 
-  const subtitle = isLoading ? t('Your wallets will appear below.') : undefined
+  const subtitle = isLoading ? t('account.wallet.select.loading.subtitle') : undefined
 
   return (
     <>
@@ -210,8 +207,8 @@ export function SelectWalletScreen({ navigation, route: { params } }: Props): JS
         title={!showError ? title : ''}>
         {showError ? (
           <BaseCard.ErrorState
-            retryButtonLabel={t('Retry')}
-            title={t('Couldn’t load addresses')}
+            retryButtonLabel={t('common.button.retry')}
+            title={t('account.wallet.select.error')}
             onRetry={onRetry}
           />
         ) : isLoading ? (
@@ -246,7 +243,7 @@ export function SelectWalletScreen({ navigation, route: { params } }: Props): JS
             }
             testID={ElementName.Next}
             onPress={onSubmit}>
-            {t('Continue')}
+            {t('common.button.continue')}
           </Button>
         </Flex>
       </OnboardingScreen>

@@ -3,7 +3,7 @@ import { trimToLength } from 'utilities/src/primitives/string'
 import { useENSAvatar, useENSName } from 'wallet/src/features/ens/api'
 import useIsFocused from 'wallet/src/features/focus/useIsFocused'
 import { UNITAG_SUFFIX } from 'wallet/src/features/unitags/constants'
-import { useUnitag } from 'wallet/src/features/unitags/hooks'
+import { useUnitagByAddress } from 'wallet/src/features/unitags/hooks'
 import { Account, SignerMnemonicAccount } from 'wallet/src/features/wallet/accounts/types'
 import { SwapProtectionSetting } from 'wallet/src/features/wallet/slice'
 import { DisplayName, DisplayNameType } from 'wallet/src/features/wallet/types'
@@ -113,6 +113,13 @@ export function useHideSpamTokensSetting(): boolean {
   return useAppSelector(selectWalletHideSpamTokensSetting)
 }
 
+type DisplayNameOptions = {
+  showShortenedEns?: boolean
+  includeUnitagSuffix?: boolean
+  showLocalName?: boolean
+  overrideDisplayName?: string
+}
+
 /**
  * Displays the ENS name if one is available otherwise displays the local name and if neither are available it shows the address.
  *
@@ -121,13 +128,6 @@ export function useHideSpamTokensSetting(): boolean {
  * @param options.includeUnitagSuffix - Whether to include the unitag suffix (.uni.eth) in returned unitag name
  * @param options.showLocalName - Whether to show the local wallet name
  */
-
-type DisplayNameOptions = {
-  showShortenedEns?: boolean
-  includeUnitagSuffix?: boolean
-  showLocalName?: boolean
-}
-
 export function useDisplayName(
   address: Maybe<string>,
   options?: DisplayNameOptions
@@ -138,11 +138,11 @@ export function useDisplayName(
     showLocalName: true,
   }
   const hookOptions = { ...defaultOptions, ...options }
-  const { showShortenedEns, includeUnitagSuffix, showLocalName } = hookOptions
+  const { showShortenedEns, includeUnitagSuffix, showLocalName, overrideDisplayName } = hookOptions
 
   const validated = getValidAddress(address)
   const ens = useENSName(validated ?? undefined)
-  const { unitag } = useUnitag(validated ?? undefined)
+  const { unitag } = useUnitagByAddress(validated ?? undefined)
 
   // Need to account for pending accounts for use within onboarding
   const maybeLocalName = useAccounts()[address ?? '']?.name
@@ -151,6 +151,15 @@ export function useDisplayName(
 
   if (!address) {
     return
+  }
+
+  if (overrideDisplayName) {
+    return {
+      name: showShortenedEns
+        ? trimToLength(overrideDisplayName, ENS_TRIM_LENGTH)
+        : overrideDisplayName,
+      type: DisplayNameType.ENS,
+    }
   }
 
   if (unitag?.username) {
@@ -171,7 +180,10 @@ export function useDisplayName(
     return { name: localName, type: DisplayNameType.Local }
   }
 
-  return { name: `${sanitizeAddressText(shortenAddress(address))}`, type: DisplayNameType.Address }
+  return {
+    name: `${sanitizeAddressText(shortenAddress(address))}`,
+    type: DisplayNameType.Address,
+  }
 }
 
 /*
@@ -182,19 +194,21 @@ export function useDisplayName(
  *  there is more latency because it has to go to the contract via CCIP-read first.
  */
 export function useAvatar(address: Maybe<string>): {
-  avatar: string | undefined
+  avatar: Maybe<string>
   loading: boolean
 } {
-  const { data: avatar } = useENSAvatar(address)
-  const { unitag, loading } = useUnitag(address || undefined)
+  const { data: ensAvatar, loading: ensLoading } = useENSAvatar(address)
+  const { unitag, loading: unitagLoading } = useUnitagByAddress(address || undefined)
 
-  if (loading) {
-    return { avatar: undefined, loading }
+  const unitagAvatar = unitag?.metadata?.avatar
+
+  if (unitagAvatar) {
+    return { avatar: unitagAvatar, loading: false }
   }
 
-  if (unitag?.metadata?.avatar) {
-    return { avatar: unitag.metadata?.avatar, loading: false }
+  if (ensAvatar) {
+    return { avatar: ensAvatar, loading: false }
   }
 
-  return { avatar, loading: false }
+  return { avatar: undefined, loading: ensLoading || unitagLoading }
 }

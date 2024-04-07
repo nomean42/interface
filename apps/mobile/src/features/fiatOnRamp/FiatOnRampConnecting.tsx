@@ -11,6 +11,7 @@ import {
 import { iconSizes } from 'ui/src/theme'
 
 export const SERVICE_PROVIDER_ICON_SIZE = 90
+export const SERVICE_PROVIDER_ICON_BORDER_RADIUS = 20
 
 export function FiatOnRampConnectingView({
   amount,
@@ -18,7 +19,7 @@ export function FiatOnRampConnectingView({
   serviceProviderName,
   serviceProviderLogo,
 }: {
-  amount: string
+  amount?: string
   quoteCurrencyCode?: string
   serviceProviderName: string
   serviceProviderLogo?: JSX.Element
@@ -46,13 +47,13 @@ export function FiatOnRampConnectingView({
         </Flex>
         <Flex centered gap="$spacing8">
           <Text variant="subheading1">
-            {t('Connecting you to {{serviceProvider}}', { serviceProvider: serviceProviderName })}
+            {t('fiatOnRamp.connection.message', { serviceProvider: serviceProviderName })}
           </Text>
-          {quoteCurrencyCode && (
+          {quoteCurrencyCode && amount && (
             <Text color="$neutral2" variant="body2">
-              {t('Buying {{amount}} worth of {{quoteCurrencyCode}}', {
+              {t('fiatOnRamp.connection.quote', {
                 amount,
-                quoteCurrencyCode,
+                currencySymbol: quoteCurrencyCode,
               })}
             </Text>
           )}
@@ -73,7 +74,7 @@ const styles = StyleSheet.create({
   },
   uniswapLogoWrapper: {
     backgroundColor: '#FFEFF8', // #FFD8EF with 40% opacity on a white background
-    borderRadius: 20,
+    borderRadius: SERVICE_PROVIDER_ICON_BORDER_RADIUS,
     height: SERVICE_PROVIDER_ICON_SIZE,
     width: SERVICE_PROVIDER_ICON_SIZE,
   },

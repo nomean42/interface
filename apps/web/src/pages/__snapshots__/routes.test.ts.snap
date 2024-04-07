@@ -16,14 +16,6 @@ Array [
     "nestedPaths": Array [
       ":tab",
       ":chainName",
-    ],
-    "path": "/explore",
-  },
-  Object {
-    "enabled": [Function],
-    "getElement": [Function],
-    "getTitle": [Function],
-    "nestedPaths": Array [
       ":tab/:chainName",
     ],
     "path": "/explore",
@@ -83,6 +75,20 @@ Array [
     "getTitle": [Function],
     "nestedPaths": Array [],
     "path": "/send",
+  },
+  Object {
+    "enabled": [Function],
+    "getElement": [Function],
+    "getTitle": [Function],
+    "nestedPaths": Array [],
+    "path": "/limits",
+  },
+  Object {
+    "enabled": [Function],
+    "getElement": [Function],
+    "getTitle": [Function],
+    "nestedPaths": Array [],
+    "path": "/limit",
   },
   Object {
     "enabled": [Function],

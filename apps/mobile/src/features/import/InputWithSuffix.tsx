@@ -7,8 +7,9 @@ import {
 } from 'react-native'
 import { ColorTokens, Flex, useSporeColors } from 'ui/src'
 import { spacing } from 'ui/src/theme'
+import { isAndroid } from 'uniswap/src/utils/platform'
 import { TextInput } from 'wallet/src/components/input/TextInput'
-import { isAndroid } from 'wallet/src/utils/platform'
+import { ElementName } from 'wallet/src/telemetry/constants'
 
 interface Props {
   alwaysShowInputSuffix?: boolean
@@ -120,9 +121,9 @@ function Inputs({
           py="$none"
           returnKeyType="done"
           scrollEnabled={false}
-          selectionColor={colors.neutral1.get()}
+          selectionColor={colors.neutral1.val}
           spellCheck={false}
-          testID="import_account_form/input"
+          testID={ElementName.ImportAccountInput}
           textAlign={isInputEmpty ? 'left' : backgroundTextAlignment}
           textAlignVertical="bottom"
           value={value}

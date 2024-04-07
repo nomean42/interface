@@ -23,6 +23,8 @@ const iconSize = {
   36: iconSizes.icon36,
   40: iconSizes.icon40,
   64: iconSizes.icon64,
+  70: iconSizes.icon70,
+  100: iconSizes.icon100,
 }
 
 export type IconSizeTokens = `$icon.${keyof typeof iconSize}`

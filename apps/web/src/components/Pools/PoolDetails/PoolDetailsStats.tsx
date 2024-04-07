@@ -3,30 +3,29 @@ import { Currency } from '@uniswap/sdk-core'
 import Column from 'components/Column'
 import CurrencyLogo from 'components/Logo/CurrencyLogo'
 import Row from 'components/Row'
-import { LoadingBubble } from 'components/Tokens/loading'
 import { DeltaArrow } from 'components/Tokens/TokenDetails/Delta'
-import { chainIdToBackendName, getTokenDetailsURL } from 'graphql/data/util'
-import { Token } from 'graphql/thegraph/__generated__/types-and-hooks'
-import { PoolData } from 'graphql/thegraph/PoolData'
+import { LoadingBubble } from 'components/Tokens/loading'
+import { chainIdToBackendName, getTokenDetailsURL, unwrapToken } from 'graphql/data/util'
 import { useCurrency } from 'hooks/Tokens'
-import { useColor } from 'hooks/useColor'
 import { useScreenSize } from 'hooks/useScreenSize'
 import { ReactNode, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Text } from 'rebass'
 import styled, { css, useTheme } from 'styled-components'
 import { BREAKPOINTS } from 'theme'
-import { colors } from 'theme/colors'
 import { ClickableStyle, ThemedText } from 'theme/components'
+import { Token } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import { NumberType, useFormatter } from 'utils/formatNumbers'
 
+import { NATIVE_CHAIN_ID, nativeOnChain } from 'constants/tokens'
+import { PoolData } from 'graphql/data/pools/usePoolData'
 import { DetailBubble } from './shared'
 
 const HeaderText = styled(Text)`
   font-weight: 485;
   font-size: 24px;
   line-height: 36px;
-  @media (max-width: ${BREAKPOINTS.lg - 1}px) {
+  @media (max-width: ${BREAKPOINTS.lg}px) {
     width: 100%;
   }
 `
@@ -40,7 +39,7 @@ const StatsWrapper = styled(Column)<{ loaded?: boolean }>`
   z-index: 1;
   margin-top: ${({ loaded }) => loaded && '-24px'};
 
-  @media (max-width: ${BREAKPOINTS.lg - 1}px) {
+  @media (max-width: ${BREAKPOINTS.lg}px) {
     flex-direction: row;
     background: transparent;
     flex-wrap: wrap;
@@ -63,7 +62,7 @@ const StatItemColumn = styled(Column)`
 const PoolBalanceSymbols = styled(Row)`
   justify-content: space-between;
 
-  @media (max-width: ${BREAKPOINTS.lg - 1}px) {
+  @media (max-width: ${BREAKPOINTS.lg}px) {
     flex-direction: column;
   }
 `
@@ -74,7 +73,7 @@ const PoolBalanceTokenNamesContainer = styled(Row)`
   line-height: 24px;
   width: max-content;
 
-  @media (max-width: ${BREAKPOINTS.lg - 1}px) {
+  @media (max-width: ${BREAKPOINTS.lg}px) {
     font-size: 20px;
     line-height: 28px;
     width: 100%;
@@ -121,7 +120,6 @@ const StatHeaderBubble = styled(LoadingBubble)`
 type TokenFullData = Token & {
   price: number
   tvl: number
-  color: string
   percent: number
   currency?: Currency
 }
@@ -130,10 +128,12 @@ const PoolBalanceTokenNames = ({ token, chainId }: { token: TokenFullData; chain
   const isScreenSize = useScreenSize()
   const screenIsNotLarge = isScreenSize['lg']
   const { formatNumber } = useFormatter()
-
+  const unwrappedToken = chainId ? unwrapToken(chainId, token) : token
+  const isNative = unwrappedToken?.address === NATIVE_CHAIN_ID
+  const currency = isNative && chainId ? nativeOnChain(chainId) : token.currency
   return (
     <PoolBalanceTokenNamesContainer>
-      {!screenIsNotLarge && <CurrencyLogo currency={token.currency} size="20px" style={{ marginRight: '8px' }} />}
+      {!screenIsNotLarge && <CurrencyLogo currency={currency} size="20px" style={{ marginRight: '8px' }} />}
       {formatNumber({
         input: token.tvl,
         type: NumberType.TokenQuantityStats,
@@ -141,15 +141,14 @@ const PoolBalanceTokenNames = ({ token, chainId }: { token: TokenFullData; chain
       &nbsp;
       <StyledLink
         to={getTokenDetailsURL({
-          address: token.id,
+          address: unwrappedToken.address,
           chain: chainIdToBackendName(chainId),
-          isInfoExplorePageEnabled: true,
         })}
       >
         {screenIsNotLarge && (
-          <CurrencyLogo currency={token.currency} size="16px" style={{ marginRight: '4px', marginLeft: '4px' }} />
+          <CurrencyLogo currency={currency} size="16px" style={{ marginRight: '4px', marginLeft: '4px' }} />
         )}
-        {token.symbol}
+        {unwrappedToken.symbol}
       </StyledLink>
     </PoolBalanceTokenNamesContainer>
   )
@@ -167,39 +166,31 @@ export function PoolDetailsStats({ poolData, isReversed, chainId, loading }: Poo
   const screenIsNotLarge = isScreenSize['lg']
   const theme = useTheme()
 
-  const currency0 = useCurrency(poolData?.token0?.id, chainId) ?? undefined
-  const currency1 = useCurrency(poolData?.token1?.id, chainId) ?? undefined
-
-  const color0 = useColor(currency0, theme.surface2, theme.darkMode)
-  let color1 = useColor(currency1, theme.surface2, theme.darkMode)
-  if (color0 === color1 && color0 === theme.accent1) {
-    color1 = colors.blue400
-  }
+  const currency0 = useCurrency(poolData?.token0?.address, chainId)
+  const currency1 = useCurrency(poolData?.token1?.address, chainId)
 
   const [token0, token1] = useMemo(() => {
-    if (poolData) {
-      const fullWidth = poolData?.tvlToken0 / poolData?.token0Price + poolData?.tvlToken1
+    if (poolData && poolData.tvlToken0 && poolData.token0Price && poolData.tvlToken1 && poolData.token1Price) {
+      const fullWidth = poolData?.tvlToken0 * poolData?.token0Price + poolData?.tvlToken1 * poolData?.token1Price
       const token0FullData: TokenFullData = {
         ...poolData?.token0,
         price: poolData?.token0Price,
         tvl: poolData?.tvlToken0,
-        color: color0,
-        percent: poolData?.tvlToken0 / poolData?.token0Price / fullWidth,
+        percent: (poolData?.tvlToken0 * poolData?.token0Price) / fullWidth,
         currency: currency0,
       }
       const token1FullData: TokenFullData = {
         ...poolData?.token1,
         price: poolData?.token1Price,
         tvl: poolData?.tvlToken1,
-        color: color1,
-        percent: poolData?.tvlToken1 / fullWidth,
+        percent: (poolData?.tvlToken1 * poolData?.token1Price) / fullWidth,
         currency: currency1,
       }
       return isReversed ? [token1FullData, token0FullData] : [token0FullData, token1FullData]
     } else {
       return [undefined, undefined]
     }
-  }, [color0, color1, currency0, currency1, isReversed, poolData])
+  }, [currency0, currency1, isReversed, poolData])
 
   if (loading || !token0 || !token1 || !poolData) {
     return (
@@ -232,14 +223,20 @@ export function PoolDetailsStats({ poolData, isReversed, chainId, loading }: Poo
         </PoolBalanceSymbols>
         {screenIsNotLarge && (
           <Row data-testid="pool-balance-chart">
-            {token0.color && <BalanceChartSide percent={token0.percent} $color={token0.color} isLeft={true} />}
-            {token1.color && <BalanceChartSide percent={token1.percent} $color={token1.color} isLeft={false} />}
+            <BalanceChartSide percent={token0.percent} $color={theme.token0} isLeft={true} />
+            <BalanceChartSide percent={token1.percent} $color={theme.token1} isLeft={false} />
           </Row>
         )}
       </StatItemColumn>
-      <StatItem title={<Trans>TVL</Trans>} value={poolData.tvlUSD} delta={poolData.tvlUSDChange} />
-      <StatItem title={<Trans>24H volume</Trans>} value={poolData.volumeUSD} delta={poolData.volumeUSDChange} />
-      <StatItem title={<Trans>24H fees</Trans>} value={poolData.volumeUSD * (poolData.feeTier / 1000000)} />
+      {poolData?.tvlUSD && (
+        <StatItem title={<Trans>TVL</Trans>} value={poolData.tvlUSD} delta={poolData.tvlUSDChange} />
+      )}
+      {poolData?.volumeUSD24H !== undefined && (
+        <StatItem title={<Trans>24H volume</Trans>} value={poolData.volumeUSD24H} delta={poolData.volumeUSD24HChange} />
+      )}
+      {poolData?.volumeUSD24H !== undefined && poolData?.feeTier !== undefined && (
+        <StatItem title={<Trans>24H fees</Trans>} value={poolData.volumeUSD24H * (poolData.feeTier / 1000000)} />
+      )}
     </StatsWrapper>
   )
 }
@@ -249,7 +246,7 @@ const StatsTextContainer = styled(Row)`
   width: 100%;
   align-items: flex-end;
 
-  @media (max-width: ${BREAKPOINTS.lg - 1}px) {
+  @media (max-width: ${BREAKPOINTS.lg}px) {
     flex-direction: column;
     gap: 0px;
     align-items: flex-start;
@@ -262,7 +259,7 @@ const StatItemText = styled(Text)`
   font-weight: 485;
   line-height: 44px;
 
-  @media (max-width: ${BREAKPOINTS.lg - 1}px) {
+  @media (max-width: ${BREAKPOINTS.lg}px) {
     font-size: 20px;
     line-height: 28px;
   }

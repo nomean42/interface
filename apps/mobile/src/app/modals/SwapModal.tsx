@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from 'src/app/hooks'
 import { BiometricsIcon } from 'src/components/icons/BiometricsIcon'
 import {
@@ -8,24 +8,15 @@ import {
 } from 'src/features/biometrics/hooks'
 import { closeModal } from 'src/features/modals/modalSlice'
 import { selectModalState } from 'src/features/modals/selectModalState'
-import { SwapFlow } from 'src/features/transactions/swap/SwapFlow'
-import { TokenSelector } from 'src/features/transactions/swapRewrite/TokenSelector'
-import { getFocusOnCurrencyFieldFromInitialState } from 'src/features/transactions/swapRewrite/utils'
 import { useWalletRestore } from 'src/features/wallet/hooks'
-import { useSporeColors } from 'ui/src'
-import { BottomSheetModal } from 'wallet/src/components/modals/BottomSheetModal'
-import { useSwapRewriteEnabled } from 'wallet/src/features/experiments/hooks'
-import { SwapFormState } from 'wallet/src/features/transactions/contexts/SwapFormContext'
-import { SwapFlow as SwapFlowRewrite } from 'wallet/src/features/transactions/swap/SwapFlow'
+import { useSwapPrefilledState } from 'wallet/src/features/transactions/swap/hooks/useSwapPrefilledState'
+import { SwapFlow } from 'wallet/src/features/transactions/swap/SwapFlow'
 import { ModalName } from 'wallet/src/telemetry/constants'
 import { updateSwapStartTimestamp } from 'wallet/src/telemetry/timing/slice'
 
 export function SwapModal(): JSX.Element {
-  const colors = useSporeColors()
   const appDispatch = useAppDispatch()
   const { initialState } = useAppSelector(selectModalState(ModalName.Swap))
-
-  const shouldShowSwapRewrite = useSwapRewriteEnabled()
 
   const onClose = useCallback((): void => {
     appDispatch(closeModal({ name: ModalName.Swap }))
@@ -38,50 +29,20 @@ export function SwapModal(): JSX.Element {
 
   const { openWalletRestoreModal, walletNeedsRestore } = useWalletRestore()
 
-  const swapRewritePrefilledState = useMemo(
-    (): SwapFormState | undefined =>
-      initialState
-        ? {
-            customSlippageTolerance: initialState.customSlippageTolerance,
-            exactAmountFiat: initialState.exactAmountFiat,
-            exactAmountToken: initialState.exactAmountToken,
-            exactCurrencyField: initialState.exactCurrencyField,
-            focusOnCurrencyField: getFocusOnCurrencyFieldFromInitialState(initialState),
-            input: initialState.input ?? undefined,
-            output: initialState.output ?? undefined,
-            selectingCurrencyField: initialState.selectingCurrencyField,
-            txId: initialState.txId,
-            isFiatMode: false,
-            isSubmitting: false,
-          }
-        : undefined,
-    [initialState]
-  )
+  const swapPrefilledState = useSwapPrefilledState(initialState)
 
   const { requiredForTransactions: requiresBiometrics } = useBiometricAppSettings()
   const { trigger: biometricsTrigger } = useBiometricPrompt()
 
-  return shouldShowSwapRewrite ? (
-    <SwapFlowRewrite
+  return (
+    <SwapFlow
       BiometricsIcon={<SwapBiometricsIcon />}
-      TokenSelector={TokenSelector}
       authTrigger={requiresBiometrics ? biometricsTrigger : undefined}
       openWalletRestoreModal={openWalletRestoreModal}
-      prefilledState={swapRewritePrefilledState}
+      prefilledState={swapPrefilledState}
       walletNeedsRestore={Boolean(walletNeedsRestore)}
       onClose={onClose}
     />
-  ) : (
-    <BottomSheetModal
-      fullScreen
-      hideHandlebar
-      hideKeyboardOnDismiss
-      renderBehindTopInset
-      backgroundColor={colors.surface1.get()}
-      name={ModalName.Swap}
-      onClose={onClose}>
-      <SwapFlow prefilledState={initialState} onClose={onClose} />
-    </BottomSheetModal>
   )
 }
 

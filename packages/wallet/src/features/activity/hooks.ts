@@ -1,11 +1,11 @@
 import { ApolloError, NetworkStatus } from '@apollo/client'
 import { useCallback, useMemo } from 'react'
-import { PollingInterval } from 'wallet/src/constants/misc'
-import { isNonPollingRequestInFlight } from 'wallet/src/data/utils'
 import {
   useFeedTransactionListQuery,
   useTransactionListQuery,
-} from 'wallet/src/data/__generated__/types-and-hooks'
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
+import { PollingInterval } from 'wallet/src/constants/misc'
+import { isNonPollingRequestInFlight } from 'wallet/src/data/utils'
 import { usePersistedError } from 'wallet/src/features/dataApi/utils'
 import { useLocalizedDayjs } from 'wallet/src/features/language/localizedDayjs'
 import {
@@ -13,8 +13,9 @@ import {
   parseDataResponseToFeedTransactionDetails,
   parseDataResponseToTransactionDetails,
 } from 'wallet/src/features/transactions/history/utils'
+import { useCurrencyIdToVisibility } from 'wallet/src/features/transactions/selectors'
 import { TransactionDetails } from 'wallet/src/features/transactions/types'
-import { isLoadingItem, isSectionHeader, LoadingItem, SectionHeader } from './utils'
+import { LoadingItem, SectionHeader, isLoadingItem, isSectionHeader } from './utils'
 
 const LOADING_ITEM = (index: number): LoadingItem => ({ itemType: 'LOADING', id: index })
 const LOADING_DATA = [LOADING_ITEM(1), LOADING_ITEM(2), LOADING_ITEM(3), LOADING_ITEM(4)]
@@ -119,7 +120,7 @@ export function useFormattedTransactionDataForFeed(
 export function useFormattedTransactionDataForActivity(
   address: Address,
   hideSpamTokens: boolean,
-  mergeLocalFunction: (
+  useMergeLocalFunction: (
     address: Address,
     remoteTransactions: TransactionDetails[] | undefined
   ) => TransactionDetails[] | undefined
@@ -144,6 +145,8 @@ export function useFormattedTransactionDataForActivity(
     pollInterval: undefined,
   })
 
+  const tokenVisibilityOverrides = useCurrencyIdToVisibility()
+
   const keyExtractor = useCallback(
     (info: TransactionDetails | SectionHeader | LoadingItem) => {
       // for loading items, use the index as the key
@@ -165,10 +168,10 @@ export function useFormattedTransactionDataForActivity(
       return
     }
 
-    return parseDataResponseToTransactionDetails(data, hideSpamTokens)
-  }, [data, hideSpamTokens])
+    return parseDataResponseToTransactionDetails(data, hideSpamTokens, tokenVisibilityOverrides)
+  }, [data, hideSpamTokens, tokenVisibilityOverrides])
 
-  const transactions = mergeLocalFunction(address, formattedTransactions)
+  const transactions = useMergeLocalFunction(address, formattedTransactions)
 
   // Format transactions for section list
   const localizedDayjs = useLocalizedDayjs()
@@ -179,7 +182,7 @@ export function useFormattedTransactionDataForActivity(
 
   const hasTransactions = transactions && transactions.length > 0
 
-  const hasData = !!data?.portfolios?.[0]?.assetActivities
+  const hasData = !!data?.portfolios?.[0]?.assetActivities?.length
   const isLoading = isNonPollingRequestInFlight(networkStatus)
   const isError = usePersistedError(requestLoading, requestError)
 

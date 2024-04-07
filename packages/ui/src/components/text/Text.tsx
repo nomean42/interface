@@ -74,6 +74,13 @@ export const TextFrame = styled(TamaguiText, {
         fontWeight: fonts.body3.fontWeight,
         maxFontSizeMultiplier: fonts.body3.maxFontSizeMultiplier,
       },
+      body4: {
+        fontFamily: '$body',
+        fontSize: fonts.body4.fontSize,
+        lineHeight: fonts.body4.lineHeight,
+        fontWeight: fonts.body4.fontWeight,
+        maxFontSizeMultiplier: fonts.body4.maxFontSizeMultiplier,
+      },
       buttonLabel1: {
         fontFamily: '$button',
         fontSize: fonts.buttonLabel1.fontSize,
@@ -137,7 +144,7 @@ export const TextPlaceholder = ({ children }: PropsWithChildren<unknown>): JSX.E
       <Flex row alignItems="center" position="relative">
         <HiddenFromScreenReaders>{children}</HiddenFromScreenReaders>
         <Flex
-          bg="$surface2"
+          backgroundColor="$surface2"
           borderRadius="$rounded4"
           bottom="5%"
           left={0}

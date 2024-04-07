@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Keyboard, LayoutChangeEvent, StyleSheet } from 'react-native'
 import { FadeIn, FadeOut, FadeOutDown } from 'react-native-reanimated'
-import { isWeb } from 'tamagui'
 import {
   AnimatedFlex,
   Button,
@@ -13,47 +12,47 @@ import {
   Icons,
   Text,
   TouchableArea,
+  isWeb,
   useDeviceDimensions,
   useSporeColors,
 } from 'ui/src'
 import InfoCircleFilled from 'ui/src/assets/icons/info-circle-filled.svg'
 import { iconSizes, spacing } from 'ui/src/theme'
 import { usePrevious } from 'utilities/src/react/hooks'
+import { NFTTransfer } from 'wallet/src/components/NFT/NFTTransfer'
 import { TransferArrowButton } from 'wallet/src/components/buttons/TransferArrowButton'
 import { RecipientInputPanel } from 'wallet/src/components/input/RecipientInputPanel'
 import { TextInputProps } from 'wallet/src/components/input/TextInput'
 import { CurrencyInputPanelLegacy } from 'wallet/src/components/legacy/CurrencyInputPanelLegacy'
 import { DecimalPadLegacy } from 'wallet/src/components/legacy/DecimalPadLegacy'
-import { getAlertColor, WarningModal } from 'wallet/src/components/modals/WarningModal/WarningModal'
-import { NFTTransfer } from 'wallet/src/components/NFT/NFTTransfer'
-import { useUSDCValue } from 'wallet/src/features/routing/useUSDCPrice'
+import { WarningModal, getAlertColor } from 'wallet/src/components/modals/WarningModal/WarningModal'
+import { WarningAction, WarningSeverity } from 'wallet/src/features/transactions/WarningModal/types'
+import { ParsedWarnings } from 'wallet/src/features/transactions/hooks/useParsedTransactionWarnings'
 import { useTokenFormActionHandlers } from 'wallet/src/features/transactions/hooks/useTokenFormActionHandlers'
 import { useTokenSelectorActionHandlers } from 'wallet/src/features/transactions/hooks/useTokenSelectorActionHandlers'
-import { useUSDTokenUpdater } from 'wallet/src/features/transactions/swap/hooks'
+import { useUSDCValue } from 'wallet/src/features/transactions/swap/trade/hooks/useUSDCPrice'
+import { useUSDTokenUpdater } from 'wallet/src/features/transactions/swap/trade/hooks/useUSDTokenUpdater'
 import { transactionStateActions } from 'wallet/src/features/transactions/transactionState/transactionState'
 import { CurrencyField } from 'wallet/src/features/transactions/transactionState/types'
-import { useOnToggleShowRecipientSelector } from 'wallet/src/features/transactions/transfer/hooks/useOnToggleShowRecipientSelector'
 import { TransferFormSpeedbumps } from 'wallet/src/features/transactions/transfer/TransferFormWarnings'
+import { useOnToggleShowRecipientSelector } from 'wallet/src/features/transactions/transfer/hooks/useOnToggleShowRecipientSelector'
 import {
   DerivedTransferInfo,
   TokenSelectorFlow,
   TransferSpeedbump,
 } from 'wallet/src/features/transactions/transfer/types'
 import { createTransactionId } from 'wallet/src/features/transactions/utils'
-import {
-  Warning,
-  WarningAction,
-  WarningSeverity,
-} from 'wallet/src/features/transactions/WarningModal/types'
 import { BlockedAddressWarning } from 'wallet/src/features/trm/BlockedAddressWarning'
 import { useIsBlocked, useIsBlockedActiveAddress } from 'wallet/src/features/trm/hooks'
+import { AccountType } from 'wallet/src/features/wallet/accounts/types'
+import { useActiveAccountWithThrow } from 'wallet/src/features/wallet/hooks'
 import { ElementName, ModalName } from 'wallet/src/telemetry/constants'
 
 interface TransferTokenProps {
   dispatch: React.Dispatch<AnyAction>
   derivedTransferInfo: DerivedTransferInfo
   onNext: () => void
-  warnings: Warning[]
+  warnings: ParsedWarnings
   showingSelectorScreen: boolean
   walletNeedsRestore: boolean
   openWalletRestoreModal?: () => void
@@ -61,6 +60,7 @@ interface TransferTokenProps {
   onDecimalPadLayout?: (event: LayoutChangeEvent) => void
   isLayoutPending: boolean
   onInputPanelLayout?: (event: LayoutChangeEvent) => void
+  setShowViewOnlyModal: (show: boolean) => void
 }
 
 export function TransferTokenForm({
@@ -75,10 +75,12 @@ export function TransferTokenForm({
   onDecimalPadLayout,
   isLayoutPending,
   onInputPanelLayout,
+  setShowViewOnlyModal,
 }: TransferTokenProps): JSX.Element {
   const { t } = useTranslation()
   const colors = useSporeColors()
   const { fullHeight } = useDeviceDimensions()
+  const account = useActiveAccountWithThrow()
 
   const {
     currencyAmounts,
@@ -133,8 +135,9 @@ export function TransferTokenForm({
     openWalletRestoreModal()
   }
 
+  const isViewOnlyWallet = account.type === AccountType.Readonly
   const actionButtonDisabled =
-    warnings.some((warning) => warning.action === WarningAction.DisableReview) ||
+    warnings.warnings.some((warning) => warning.action === WarningAction.DisableReview) ||
     transferSpeedbump.loading ||
     isBlocked ||
     isBlockedLoading ||
@@ -147,12 +150,14 @@ export function TransferTokenForm({
   }, [dispatch, onNext])
 
   const onPressReview = useCallback(() => {
-    if (transferSpeedbump.hasWarning) {
+    if (isViewOnlyWallet) {
+      setShowViewOnlyModal(true)
+    } else if (transferSpeedbump.hasWarning) {
       setShowSpeedbumpModal(true)
     } else {
       goToNext()
     }
-  }, [goToNext, transferSpeedbump.hasWarning])
+  }, [goToNext, transferSpeedbump.hasWarning, isViewOnlyWallet, setShowViewOnlyModal])
 
   const onSetTransferSpeedbump = useCallback(({ hasWarning, loading }: TransferSpeedbump) => {
     setTransferSpeedbump({ hasWarning, loading })
@@ -216,7 +221,9 @@ export function TransferTokenForm({
     setShowWarningModal(true)
   }
 
-  const transferWarning = warnings.find((warning) => warning.severity >= WarningSeverity.Low)
+  const transferWarning = warnings.warnings.find(
+    (warning) => warning.severity >= WarningSeverity.Low
+  )
   const transferWarningColor = getAlertColor(transferWarning?.severity)
 
   const TRANSFER_DIRECTION_BUTTON_SIZE = iconSizes.icon20
@@ -229,7 +236,7 @@ export function TransferTokenForm({
       {showWarningModal && transferWarning?.title && (
         <WarningModal
           caption={transferWarning.message}
-          confirmText={t('Close')}
+          confirmText={t('common.button.close')}
           icon={
             <SendWarningIcon
               color={transferWarningColor.text}
@@ -255,7 +262,8 @@ export function TransferTokenForm({
       <Flex grow gap="$spacing8" justifyContent="space-between">
         <AnimatedFlex
           entering={FadeIn}
-          exiting={FadeOut}
+          // TODO(EXT-526): re-enable `exiting` animation when it's fixed.
+          exiting={isWeb ? undefined : FadeOut}
           gap="$spacing2"
           onLayout={onInputPanelLayout}>
           {nftIn ? (
@@ -272,7 +280,7 @@ export function TransferTokenForm({
                 showSoftInputOnFocus={showNativeKeyboard}
                 usdValue={inputCurrencyUSDValue}
                 value={isFiatInput ? exactAmountFiat : exactAmountToken}
-                warnings={warnings}
+                warnings={warnings.warnings}
                 onPressIn={(): void => setCurrencyFieldFocused(true)}
                 onSelectionChange={
                   showNativeKeyboard
@@ -304,7 +312,7 @@ export function TransferTokenForm({
                 alignItems="center"
                 bottom={TRANSFER_DIRECTION_BUTTON_SIZE / 2}
                 position="absolute">
-                <TransferArrowButton disabled bg="$surface2" padding="$spacing8" />
+                <TransferArrowButton disabled backgroundColor="$surface2" p="$spacing8" />
               </Flex>
             </Flex>
           </Flex>
@@ -344,7 +352,7 @@ export function TransferTokenForm({
                       width={iconSizes.icon20}
                     />
                     <Text color="$DEP_accentWarning" variant="subheading2">
-                      {t('Restore your wallet to send')}
+                      {t('send.warning.restore')}
                     </Text>
                   </Flex>
                 </TouchableArea>
@@ -395,7 +403,8 @@ export function TransferTokenForm({
 
         <AnimatedFlex
           bottom={0}
-          exiting={FadeOutDown}
+          // TODO(EXT-526): re-enable `exiting` animation when it's fixed.
+          exiting={isWeb ? undefined : FadeOutDown}
           gap="$spacing8"
           left={0}
           opacity={isLayoutPending ? 0 : 1}
@@ -417,11 +426,13 @@ export function TransferTokenForm({
             />
           )}
           <Button
-            disabled={actionButtonDisabled}
+            disabled={actionButtonDisabled && !isViewOnlyWallet}
+            // Override opacity only for view only wallets
+            opacity={isViewOnlyWallet ? 0.4 : undefined}
             size="large"
             testID={ElementName.ReviewTransfer}
             onPress={onPressReview}>
-            {t('Review transfer')}
+            {t('send.button.review')}
           </Button>
         </AnimatedFlex>
       </Flex>

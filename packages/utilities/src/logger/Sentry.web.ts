@@ -1,5 +1,6 @@
+import * as SentryReact from '@sentry/react'
 import { CaptureContext, SeverityLevel } from '@sentry/types'
-import { ISentry } from './Sentry'
+import { BreadCrumb, ISentry } from './Sentry'
 
 /**
  * Logs an exception to our Sentry Dashboard
@@ -8,8 +9,7 @@ import { ISentry } from './Sentry'
  * @param context Context from where this method is called
  */
 export function captureException(error: unknown, captureContext?: CaptureContext): void {
-  // eslint-disable-next-line no-console
-  console.warn(error, captureContext)
+  SentryReact.captureException(error, captureContext)
 }
 
 /**
@@ -27,11 +27,19 @@ export function captureMessage(
   message: string,
   ...extraArgs: unknown[]
 ): void {
-  // eslint-disable-next-line no-console
-  console.log(context, message, ...extraArgs)
+  SentryReact.captureMessage(message, {
+    level,
+    tags: { webContext: context },
+    ...(extraArgs ? { extra: { data: extraArgs } } : {}),
+  })
+}
+
+function addBreadCrumb(breadCrumb: BreadCrumb): void {
+  SentryReact.addBreadcrumb(breadCrumb)
 }
 
 export const Sentry: ISentry = {
   captureException,
   captureMessage,
+  addBreadCrumb,
 } as ISentry

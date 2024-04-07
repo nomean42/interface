@@ -1,102 +1,93 @@
+import { SharedEventName } from '@uniswap/analytics-events'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import 'react-native-reanimated'
-import { useAppDispatch } from 'src/app/hooks'
+import { useAppDispatch, useAppSelector } from 'src/app/hooks'
 import { navigate } from 'src/app/navigation/rootNavigation'
 import { closeModal } from 'src/features/modals/modalSlice'
+import { selectModalState } from 'src/features/modals/selectModalState'
+import { TermsOfService } from 'src/screens/Onboarding/TermsOfService'
 import { Screens, UnitagScreens } from 'src/screens/Screens'
-import { Button, Flex, GeneratedIcon, Icons, Image, Text } from 'ui/src'
-import { UNITAGS_BANNER_HORIZONTAL } from 'ui/src/assets'
+import { Button, Flex, GeneratedIcon, Icons, Image, Text, useIsDarkMode } from 'ui/src'
+import { UNITAGS_INTRO_BANNER_DARK, UNITAGS_INTRO_BANNER_LIGHT } from 'ui/src/assets'
 import { iconSizes } from 'ui/src/theme'
 import { BottomSheetModal } from 'wallet/src/components/modals/BottomSheetModal'
+import { setHasCompletedUnitagsIntroModal } from 'wallet/src/features/behaviorHistory/slice'
+import { sendWalletAnalyticsEvent } from 'wallet/src/telemetry'
 import { ModalName } from 'wallet/src/telemetry/constants'
 
 export function UnitagsIntroModal(): JSX.Element {
   const { t } = useTranslation()
+  const isDarkMode = useIsDarkMode()
   const appDispatch = useAppDispatch()
+  const modalState = useAppSelector(selectModalState(ModalName.UnitagsIntro)).initialState
+  const address = modalState?.address
+  const entryPoint = modalState?.entryPoint
 
   const onClose = (): void => {
     appDispatch(closeModal({ name: ModalName.UnitagsIntro }))
   }
 
   const onPressClaimOneNow = (): void => {
+    if (!entryPoint) {
+      throw new Error('Missing entry point in UnitagsIntroModal')
+    }
+
+    appDispatch(setHasCompletedUnitagsIntroModal(true))
     navigate(Screens.UnitagStack, {
       screen: UnitagScreens.ClaimUnitag,
       params: {
-        entryPoint: Screens.Home,
+        entryPoint,
+        address,
       },
     })
-    onClose()
-  }
-
-  const onPressMaybeLater = (): void => {
+    if (address) {
+      sendWalletAnalyticsEvent(SharedEventName.TERMS_OF_SERVICE_ACCEPTED, { address })
+    }
     onClose()
   }
 
   return (
     <BottomSheetModal name={ModalName.UnitagsIntro} onClose={onClose}>
-      <Flex $short={{ gap: '$spacing16' }} gap="$spacing24" px="$spacing24" py="$spacing16">
+      <Flex gap="$spacing24" px="$spacing24" py="$spacing16">
         <Flex alignItems="center" gap="$spacing12">
-          <Flex maxHeight={70}>
-            <Image maxHeight={70} resizeMode="contain" source={UNITAGS_BANNER_HORIZONTAL} />
-          </Flex>
-          <Text variant="heading3">{t('Introducing Usernames')}</Text>
+          <Text variant="subheading1">{t('unitags.intro.title')}</Text>
+          <Text color="$neutral2" textAlign="center" variant="body2">
+            {t('unitags.intro.subtitle')}
+          </Text>
         </Flex>
-        <Flex gap="$spacing16" px="$spacing12">
-          <BodyItem
-            Icon={Icons.Quotes}
-            subtitle={t('Say goodbye to copying, pasting, and triple-checking 0x addresses.')}
-            title={t('Human readable')}
-          />
-          <BodyItem
-            Icon={Icons.Photo}
-            subtitle={t('Upload an avatar, create a bio, and link your socials.')}
-            title={t('Customizable profile')}
-          />
-          <BodyItem
-            Icon={Icons.Ticket}
-            subtitle={t('Create your unique username for free, no network fees involved.')}
-            title={t('Free to claim')}
-          />
-          <BodyItem
-            Icon={Icons.Lightning}
-            subtitle={t('Uniswap usernames are built on top of ENS subdomains.')}
-            title={t('Powered by ENS')}
+        <Flex alignItems="center" maxHeight={105}>
+          <Image
+            maxHeight={105}
+            resizeMode="contain"
+            source={isDarkMode ? UNITAGS_INTRO_BANNER_DARK : UNITAGS_INTRO_BANNER_LIGHT}
           />
         </Flex>
-        <Flex gap="$spacing8" mt="$spacing16">
+        <Flex gap="$spacing16" px="$spacing20">
+          <BodyItem Icon={Icons.UserSquare} title={t('unitags.intro.features.profile')} />
+          <BodyItem Icon={Icons.Ticket} title={t('unitags.intro.features.free')} />
+          <BodyItem Icon={Icons.Lightning} title={t('unitags.intro.features.ens')} />
+        </Flex>
+        <Flex gap="$spacing8">
           <Button size="medium" theme="primary" onPress={onPressClaimOneNow}>
-            {t('Claim one now')}
+            {t('common.button.continue')}
           </Button>
-          <Button size="medium" theme="secondary" onPress={onPressMaybeLater}>
-            {t('Maybe later')}
-          </Button>
+        </Flex>
+        <Flex $short={{ py: '$none', mx: '$spacing12' }} mx="$spacing24">
+          <TermsOfService />
         </Flex>
       </Flex>
     </BottomSheetModal>
   )
 }
 
-function BodyItem({
-  Icon,
-  title,
-  subtitle,
-}: {
-  Icon: GeneratedIcon
-  title: string
-  subtitle: string
-}): JSX.Element {
+function BodyItem({ Icon, title }: { Icon: GeneratedIcon; title: string }): JSX.Element {
   return (
-    <Flex row alignItems="center" gap="$spacing24">
-      <Icon color="$accent1" size={iconSizes.icon24} strokeWidth={2} />
-      <Flex fill $short={{ gap: '$spacing2' }} gap="$spacing4">
-        <Text color="$accent1" variant="subheading2">
-          {title}
-        </Text>
-        <Text color="$neutral2" variant="body3">
-          {subtitle}
-        </Text>
-      </Flex>
+    <Flex row alignItems="center" gap="$spacing16">
+      <Icon color="$accent1" size={iconSizes.icon20} strokeWidth={2} />
+      <Text color="$neutral2" variant="body3">
+        {title}
+      </Text>
     </Flex>
   )
 }

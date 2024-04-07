@@ -5,13 +5,16 @@ import { PasswordInput } from 'src/components/input/PasswordInput'
 import { PasswordError } from 'src/features/onboarding/PasswordError'
 import { Button, Flex, Icons, Text } from 'ui/src'
 import { iconSizes } from 'ui/src/theme'
+import { useDebounce } from 'utilities/src/time/timing'
 import { ElementName } from 'wallet/src/telemetry/constants'
-import { validatePassword } from 'wallet/src/utils/password'
-
-export enum PasswordErrors {
-  WeakPassword = 'WeakPassword',
-  PasswordsDoNotMatch = 'PasswordsDoNotMatch',
-}
+import {
+  PASSWORD_VALIDATION_DEBOUNCE_MS,
+  PasswordErrors,
+  PasswordStrength,
+  getPasswordStrength,
+  getPasswordStrengthTextAndColor,
+  isPasswordStrongEnough,
+} from 'wallet/src/utils/password'
 
 export type CloudBackupPasswordProps = {
   navigateToNextScreen: ({ password }: { password: string }) => void
@@ -29,9 +32,17 @@ export function CloudBackupPasswordForm({
   const passwordInputRef = useRef<TextInput>(null)
   const [password, setPassword] = useState('')
 
-  const [error, setError] = useState<PasswordErrors | string | undefined>(undefined)
+  const [error, setError] = useState<PasswordErrors | undefined>(undefined)
 
-  const isButtonDisabled = !!error || password.length === 0
+  const [passwordStrength, setPasswordStrength] = useState(PasswordStrength.NONE)
+  const debouncedPasswordStrength = useDebounce(passwordStrength, PASSWORD_VALIDATION_DEBOUNCE_MS)
+  const isStrongPassword = isPasswordStrongEnough({
+    minStrength: PasswordStrength.MEDIUM,
+    currentStrength: passwordStrength,
+  })
+
+  const isButtonDisabled =
+    !!error || password.length === 0 || (!isConfirmation && !isStrongPassword)
 
   const onPasswordChangeText = (newPassword: string): void => {
     if (isConfirmation && newPassword === password) {
@@ -39,15 +50,15 @@ export function CloudBackupPasswordForm({
     }
     // always reset error if not confirmation
     if (!isConfirmation) {
+      setPasswordStrength(getPasswordStrength(newPassword))
       setError(undefined)
     }
     setPassword(newPassword)
   }
 
   const onPasswordSubmitEditing = (): void => {
-    const { valid, validationErrorString } = validatePassword(password)
-    if (!isConfirmation && !valid) {
-      setError(validationErrorString || PasswordErrors.WeakPassword)
+    if (!isConfirmation && !isStrongPassword) {
+      setError(PasswordErrors.WeakPassword)
       return
     }
     if (isConfirmation && passwordToConfirm !== password) {
@@ -59,9 +70,8 @@ export function CloudBackupPasswordForm({
   }
 
   const onPressNext = (): void => {
-    const { valid, validationErrorString } = validatePassword(password)
-    if (!isConfirmation && !valid) {
-      setError(validationErrorString || PasswordErrors.WeakPassword)
+    if (!isConfirmation && !isStrongPassword) {
+      setError(PasswordErrors.WeakPassword)
       return
     }
     if (isConfirmation && passwordToConfirm !== password) {
@@ -76,9 +86,9 @@ export function CloudBackupPasswordForm({
 
   let errorText = ''
   if (error === PasswordErrors.WeakPassword) {
-    errorText = t('Weak password')
+    errorText = t('settings.setting.backup.password.error.weak')
   } else if (error === PasswordErrors.PasswordsDoNotMatch) {
-    errorText = t('Passwords do not match')
+    errorText = t('settings.setting.backup.password.error.mismatch')
   } else if (error) {
     // use the upstream zxcvbn error message
     errorText = error
@@ -90,7 +100,11 @@ export function CloudBackupPasswordForm({
         <Flex gap="$spacing8">
           <PasswordInput
             ref={passwordInputRef}
-            placeholder={isConfirmation ? t('Confirm password') : t('Create password')}
+            placeholder={
+              isConfirmation
+                ? t('settings.setting.backup.password.placeholder.confirm')
+                : t('settings.setting.backup.password.placeholder.create')
+            }
             returnKeyType="next"
             value={password}
             onChangeText={(newText: string): void => {
@@ -99,22 +113,50 @@ export function CloudBackupPasswordForm({
             }}
             onSubmitEditing={onPasswordSubmitEditing}
           />
+          {!isConfirmation && <PasswordStrengthText strength={debouncedPasswordStrength} />}
           {error ? <PasswordError errorText={errorText} /> : null}
         </Flex>
         {!isConfirmation && (
           <Flex centered row gap="$spacing12" px="$spacing16">
             <Icons.DiamondExclamation color="$neutral2" size={iconSizes.icon20} />
             <Text color="$neutral2" variant="body3">
-              {t(
-                'Uniswap Labs does not store your password and can’t recover it, so it’s crucial you remember it.'
-              )}
+              {t('settings.setting.backup.password.disclaimer')}
             </Text>
           </Flex>
         )}
       </Flex>
       <Button disabled={isButtonDisabled} testID={ElementName.Next} onPress={onPressNext}>
-        {t('Continue')}
+        {t('common.button.continue')}
       </Button>
     </>
+  )
+}
+
+function PasswordStrengthText({ strength }: { strength: PasswordStrength }): JSX.Element {
+  const { t } = useTranslation()
+  const { color } = getPasswordStrengthTextAndColor(strength)
+
+  const hasPassword = strength !== PasswordStrength.NONE
+  let strengthText: string = ''
+  switch (strength) {
+    case PasswordStrength.STRONG:
+      strengthText = t('settings.setting.backup.password.strong')
+      break
+    case PasswordStrength.MEDIUM:
+      strengthText = t('settings.setting.backup.password.medium')
+      break
+    case PasswordStrength.WEAK:
+      strengthText = t('settings.setting.backup.password.weak')
+      break
+    default:
+      break
+  }
+
+  return (
+    <Flex centered row opacity={hasPassword ? 1 : 0} pt="$spacing12" px="$spacing8">
+      <Text color={color} variant="body3">
+        {strengthText}
+      </Text>
+    </Flex>
   )
 }

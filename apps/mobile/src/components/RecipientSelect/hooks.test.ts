@@ -3,24 +3,38 @@ import { waitFor } from '@testing-library/react-native'
 import { toIncludeSameMembers } from 'jest-extended'
 import { act } from 'react-test-renderer'
 import { MobileState } from 'src/app/reducer'
+import { renderHookWithProviders } from 'src/test/render'
 import { useRecipients } from 'wallet/src/components/RecipientSearch/hooks'
 import { ChainId } from 'wallet/src/constants/chains'
 import { SearchableRecipient } from 'wallet/src/features/address/types'
 import { TransactionStateMap } from 'wallet/src/features/transactions/slice'
-import { SendTokenTransactionInfo } from 'wallet/src/features/transactions/types'
+import { TransactionStatus } from 'wallet/src/features/transactions/types'
 import { SwapProtectionSetting } from 'wallet/src/features/wallet/slice'
 import {
-  account,
-  account2,
   SAMPLE_SEED_ADDRESS_1,
   SAMPLE_SEED_ADDRESS_2,
-  sendTxDetailsConfirmed,
-  sendTxDetailsFailed,
-  sendTxDetailsPending,
+  sendTokenTransactionInfo,
+  signerMnemonicAccount,
+  transactionDetails,
 } from 'wallet/src/test/fixtures'
-import { renderHook } from 'wallet/src/test/test-utils'
 
 expect.extend({ toIncludeSameMembers })
+
+const sendTxDetailsPending = transactionDetails({
+  status: TransactionStatus.Pending,
+  typeInfo: sendTokenTransactionInfo(),
+  addedTime: 1487076708000,
+})
+const sendTxDetailsConfirmed = transactionDetails({
+  status: TransactionStatus.Success,
+  typeInfo: sendTokenTransactionInfo(),
+  addedTime: 1487076708000,
+})
+const sendTxDetailsFailed = transactionDetails({
+  status: TransactionStatus.Failed,
+  typeInfo: sendTokenTransactionInfo(),
+  addedTime: 1487076710000,
+})
 
 /**
  * Tests interaction of mobile state with useRecipients hook
@@ -39,7 +53,7 @@ const getPreloadedState = (props?: PreloadedStateProps): PreloadedState<MobileSt
       watchedAddresses,
       tokens: [],
       tokensVisibility: {},
-      nftsData: {},
+      nftsVisibility: {},
     },
     wallet: {
       accounts: {
@@ -58,11 +72,10 @@ const getPreloadedState = (props?: PreloadedStateProps): PreloadedState<MobileSt
   }
 }
 
-const activeAccount = account
-const inactiveAccount = account2
+const activeAccount = signerMnemonicAccount()
+const inactiveAccount = signerMnemonicAccount()
 const validatedAddressRecipient: SearchableRecipient = {
   address: SAMPLE_SEED_ADDRESS_1,
-  name: null,
 }
 
 const watchedAddresses = [SAMPLE_SEED_ADDRESS_1, SAMPLE_SEED_ADDRESS_2]
@@ -76,15 +89,15 @@ const recentRecipientsSectionResult = {
   title: 'Recent',
   data: [
     {
-      address: (sendTxDetailsFailed.typeInfo as SendTokenTransactionInfo).recipient,
+      address: sendTxDetailsFailed.typeInfo.recipient,
       name: '',
     },
     {
-      address: (sendTxDetailsConfirmed.typeInfo as SendTokenTransactionInfo).recipient,
+      address: sendTxDetailsConfirmed.typeInfo.recipient,
       name: '',
     },
     {
-      address: (sendTxDetailsPending.typeInfo as SendTokenTransactionInfo).recipient,
+      address: sendTxDetailsPending.typeInfo.recipient,
       name: '',
     },
   ],
@@ -107,7 +120,7 @@ const favoriteWalletsSectionResult = {
 
 describe(useRecipients, () => {
   it('returns correct initial values', () => {
-    const { result } = renderHook(useRecipients, {
+    const { result } = renderHookWithProviders(useRecipients, {
       preloadedState: getPreloadedState(),
     })
 
@@ -122,7 +135,7 @@ describe(useRecipients, () => {
 
   describe('Validated address recipient', () => {
     it('result does not contain Search Results section if there is no pattern', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState(),
       })
 
@@ -136,7 +149,7 @@ describe(useRecipients, () => {
     })
 
     it('result contains Search Results section if there is a pattern', async () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState(),
       })
 
@@ -146,16 +159,12 @@ describe(useRecipients, () => {
       })
 
       await waitFor(() => {
-        expect(result.current).toEqual(
-          expect.objectContaining({
-            sections: expect.arrayContaining([searchSectionResult]),
-          })
-        )
+        expect(result.current.sections).toEqual(expect.arrayContaining([searchSectionResult]))
       })
     })
 
     it('searchableRecipientOptions contains validatedAddressRecipient', async () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState(),
       })
 
@@ -164,25 +173,20 @@ describe(useRecipients, () => {
         result.current.onChangePattern(SAMPLE_SEED_ADDRESS_1)
       })
 
-      expect(result.current).toEqual(
-        expect.objectContaining({
-          searchableRecipientOptions: [
-            {
-              data: {
-                address: SAMPLE_SEED_ADDRESS_1,
-                name: null,
-              },
-              key: SAMPLE_SEED_ADDRESS_1,
-            },
-          ],
-        })
+      expect(result.current.searchableRecipientOptions).toEqual(
+        expect.arrayContaining([
+          {
+            data: expect.objectContaining({ address: SAMPLE_SEED_ADDRESS_1 }),
+            key: SAMPLE_SEED_ADDRESS_1,
+          },
+        ])
       )
     })
   })
 
   describe('Recent recipients', () => {
     it('result does not contain Recent section if there are no recent recipients', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState(),
       })
 
@@ -194,7 +198,7 @@ describe(useRecipients, () => {
     })
 
     it('result contains Recent section if there are recent recipients', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({
           transactions: {
             [activeAccount.address]: {
@@ -211,7 +215,7 @@ describe(useRecipients, () => {
               title: 'Recent',
               data: [
                 {
-                  address: (sendTxDetailsPending.typeInfo as SendTokenTransactionInfo).recipient,
+                  address: sendTxDetailsPending.typeInfo.recipient,
                   name: '',
                 },
               ],
@@ -222,7 +226,7 @@ describe(useRecipients, () => {
     })
 
     it('returns unique recipient addresses', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({
           transactions: {
             [activeAccount.address]: {
@@ -234,28 +238,27 @@ describe(useRecipients, () => {
         }),
       })
 
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const section = result.current.sections[0]!
       expect(section.title).toEqual('Recent')
       // This method doesn't check the order of the elements
       expect(section.data).toIncludeSameMembers([
         {
-          address: (sendTxDetailsPending.typeInfo as SendTokenTransactionInfo).recipient,
+          address: sendTxDetailsPending.typeInfo.recipient,
           name: '',
         },
         {
-          address: (sendTxDetailsConfirmed.typeInfo as SendTokenTransactionInfo).recipient,
+          address: sendTxDetailsConfirmed.typeInfo.recipient,
           name: '',
         },
         {
-          address: (sendTxDetailsFailed.typeInfo as SendTokenTransactionInfo).recipient,
+          address: sendTxDetailsFailed.typeInfo.recipient,
           name: '',
         },
       ])
     })
 
     it('sorts recipients by most recent transaction', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({
           transactions: {
             [activeAccount.address]: {
@@ -277,7 +280,7 @@ describe(useRecipients, () => {
     })
 
     it('searchableRecipientOptions contains recent recipients', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({
           transactions: {
             [activeAccount.address]: {
@@ -295,7 +298,7 @@ describe(useRecipients, () => {
 
   describe('Inactive local accounts', () => {
     it('result does not contain Your wallets section if there are no inactive accounts', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState(),
       })
 
@@ -309,7 +312,7 @@ describe(useRecipients, () => {
     })
 
     it('result contains Your wallets section if there are inactive accounts', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({ hasInactiveAccounts: true }),
       })
 
@@ -321,7 +324,7 @@ describe(useRecipients, () => {
     })
 
     it('searchableRecipientOptions contains inactive accounts', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({ hasInactiveAccounts: true }),
       })
 
@@ -335,7 +338,7 @@ describe(useRecipients, () => {
 
   describe('Watched wallets', () => {
     it('result does not contain Favorite Wallets section if there are no watched wallets', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState(),
       })
 
@@ -349,7 +352,7 @@ describe(useRecipients, () => {
     })
 
     it('result contains Favorite Wallets section if there are watched wallets', () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({
           watchedAddresses,
         }),
@@ -365,7 +368,7 @@ describe(useRecipients, () => {
 
   describe('multiple sections', () => {
     it('result contains all sections', async () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({
           watchedAddresses,
           hasInactiveAccounts: true,
@@ -398,7 +401,7 @@ describe(useRecipients, () => {
     })
 
     it('searchableRecipientOptions contains all unique recipients', async () => {
-      const { result } = renderHook(useRecipients, {
+      const { result } = renderHookWithProviders(useRecipients, {
         preloadedState: getPreloadedState({
           watchedAddresses,
           hasInactiveAccounts: true,

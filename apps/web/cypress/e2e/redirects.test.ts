@@ -8,3 +8,16 @@ describe('Redirect', () => {
     cy.url().should('match', /\/not-found/)
   })
 })
+
+describe('RedirectExplore', () => {
+  it('should redirect from /tokens/ to /explore', () => {
+    cy.visit('/tokens')
+    cy.url().should('match', /\/explore/)
+
+    cy.visit('/tokens/ethereum')
+    cy.url().should('match', /\/explore\/tokens\/ethereum/)
+
+    cy.visit('/tokens/optimism/NATIVE')
+    cy.url().should('match', /\/explore\/tokens\/optimism\/NATIVE/)
+  })
+})

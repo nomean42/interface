@@ -7,32 +7,24 @@ import { t } from '@lingui/macro'
  * @param {number} locale - BCP 47 language tag (e.g. en-US).
  * @returns {string} Message to display.
  */
-export function getLocaleTimeString(timestamp: number, locale = 'en-US') {
+export function getAbbreviatedTimeString(timestamp: number) {
   const now = Date.now()
   const timeSince = now - timestamp
   const secondsPassed = Math.floor(timeSince / 1000)
   const minutesPassed = Math.floor(secondsPassed / 60)
   const hoursPassed = Math.floor(minutesPassed / 60)
+  const daysPassed = Math.floor(hoursPassed / 24)
+  const monthsPassed = Math.floor(daysPassed / 30)
 
-  if (hoursPassed > 24) {
-    const options: Intl.DateTimeFormatOptions = {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }
-    const date = new Date(timestamp)
-    return date
-      .toLocaleString(locale, options)
-      .toLocaleLowerCase(locale)
-      .replace(/\s(am|pm)/, '$1')
-  } else if (hoursPassed == 24) {
-    return t`1 day ago`
-  } else if (minutesPassed >= 60) {
-    return `${hoursPassed} ${hoursPassed === 1 ? t`hour ago` : t`hours ago`}`
-  } else if (secondsPassed >= 60) {
-    return `${minutesPassed} ${minutesPassed === 1 ? t`minute ago` : t`minutes ago`}`
+  if (monthsPassed > 0) {
+    return t`${monthsPassed}mo ago`
+  } else if (daysPassed > 0) {
+    return t`${daysPassed}d ago`
+  } else if (hoursPassed > 0) {
+    return t`${hoursPassed}h ago`
+  } else if (minutesPassed > 0) {
+    return t`${minutesPassed}m ago`
   } else {
-    return `${secondsPassed} ${secondsPassed === 1 ? t`second ago` : t`seconds ago`}`
+    return t`${secondsPassed}s ago`
   }
 }

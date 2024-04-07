@@ -3,10 +3,10 @@ import { useAnimatedStyle } from 'react-native-reanimated'
 import { useLineChartDatetime } from 'react-native-wagmi-charts'
 import { AnimatedText } from 'src/components/text/AnimatedText'
 import { Flex, Icons, useSporeColors } from 'ui/src'
+import { isAndroid } from 'uniswap/src/utils/platform'
 import { FiatCurrency } from 'wallet/src/features/fiatCurrency/constants'
 import { useAppFiatCurrency, useAppFiatCurrencyInfo } from 'wallet/src/features/fiatCurrency/hooks'
 import { useCurrentLocale } from 'wallet/src/features/language/hooks'
-import { isAndroid } from 'wallet/src/utils/platform'
 import { AnimatedDecimalNumber } from './AnimatedDecimalNumber'
 import { useLineChartPrice, useLineChartRelativeChange } from './usePrice'
 
@@ -71,7 +71,6 @@ export function RelativeChangeText({ loading }: { loading: boolean }): JSX.Eleme
         style={[
           caretStyle,
           // fix vertical centering
-          // eslint-disable-next-line react-native/no-inline-styles
           { translateY: relativeChange.value.value > 0 ? -1 : 1 },
         ]}
       />

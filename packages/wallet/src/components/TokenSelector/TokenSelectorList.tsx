@@ -1,10 +1,10 @@
 import { memo, useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FadeIn, FadeOut } from 'react-native-reanimated'
-import { AnimatedFlex, Flex, FlexLoader, Skeleton, Text } from 'ui/src'
+import { AnimatedFlex, Flex, isWeb, Loader, Skeleton, Text } from 'ui/src'
 import { fonts } from 'ui/src/theme'
+import { CurrencyId } from 'uniswap/src/types/currency'
 import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
-import { TokenLoader } from 'wallet/src/components/loading/TokenLoader'
 import { useBottomSheetFocusHook } from 'wallet/src/components/modals/hooks'
 import { renderSuggestedTokenItem } from 'wallet/src/components/TokenSelector/renderSuggestedTokenItem'
 import { suggestedTokensKeyExtractor } from 'wallet/src/components/TokenSelector/suggestedTokensKeyExtractor'
@@ -22,7 +22,6 @@ import {
   TokenSelectorListSections,
 } from 'wallet/src/components/TokenSelector/types'
 import { ChainId } from 'wallet/src/constants/chains'
-import { CurrencyId } from 'wallet/src/utils/currencyId'
 
 function isSuggestedTokenItem(data: TokenOption | TokenOption[]): data is TokenOption[] {
   return Array.isArray(data)
@@ -152,8 +151,8 @@ function _TokenSelectorList({
       <>
         <Flex grow justifyContent="center">
           <BaseCard.ErrorState
-            retryButtonLabel={t('Retry')}
-            title={errorText ?? t('Couldn’t load tokens')}
+            retryButtonLabel={t('common.button.retry')}
+            title={errorText ?? t('tokens.selector.error.load')}
             onRetry={refetch}
           />
         </Flex>
@@ -171,16 +170,17 @@ function _TokenSelectorList({
       <Flex grow>
         <Flex py="$spacing16" width={80}>
           <Skeleton>
-            <FlexLoader height={fonts.subheading2.lineHeight} />
+            <Loader.Box height={fonts.subheading2.lineHeight} />
           </Skeleton>
         </Flex>
-        <TokenLoader repeat={5} />
+        <Loader.Token repeat={5} />
       </Flex>
     )
   }
 
   return (
-    <AnimatedFlex grow entering={FadeIn} exiting={FadeOut}>
+    // TODO(EXT-526): re-enable `exiting` animation when it's fixed.
+    <AnimatedFlex grow entering={FadeIn} exiting={isWeb ? undefined : FadeOut}>
       <TokenSectionBaseList
         ListEmptyComponent={emptyElement}
         focusHook={useBottomSheetFocusHook}

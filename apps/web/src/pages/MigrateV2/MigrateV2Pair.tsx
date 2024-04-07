@@ -1,12 +1,12 @@
 import { Contract } from '@ethersproject/contracts'
 import type { TransactionResponse } from '@ethersproject/providers'
-import { Trans } from '@lingui/macro'
+import { Select, Trans } from '@lingui/macro'
 import { LiquidityEventName, LiquiditySource } from '@uniswap/analytics-events'
 import { CurrencyAmount, Fraction, Percent, Price, Token, V2_FACTORY_ADDRESSES } from '@uniswap/sdk-core'
 import { FeeAmount, Pool, Position, priceToClosestTick, TickMath } from '@uniswap/v3-sdk'
 import { useWeb3React } from '@web3-react/core'
 import { sendAnalyticsEvent, useTrace } from 'analytics'
-import Badge, { BadgeVariant } from 'components/Badge'
+import Badge from 'components/Badge'
 import { ButtonConfirmed } from 'components/Button'
 import { BlueCard, DarkGrayCard, LightCard, YellowCard } from 'components/Card'
 import DoubleCurrencyLogo from 'components/DoubleLogo'
@@ -17,10 +17,9 @@ import SettingsTab from 'components/Settings'
 import { Dots } from 'components/swap/styled'
 import { V2Unsupported } from 'components/V2Unsupported'
 import { ApprovalState, useApproveCallback } from 'hooks/useApproveCallback'
-import useCurrentBlockTimestamp from 'hooks/useCurrentBlockTimestamp'
 import { useNetworkSupportsV2 } from 'hooks/useNetworkSupportsV2'
 import { PoolState, usePool } from 'hooks/usePools'
-import useTransactionDeadline from 'hooks/useTransactionDeadline'
+import { useGetTransactionDeadline } from 'hooks/useTransactionDeadline'
 import { useV2LiquidityTokenPermit } from 'hooks/useV2LiquidityTokenPermit'
 import JSBI from 'jsbi'
 import { NEVER_RELOAD, useSingleCallResult } from 'lib/hooks/multicall'
@@ -37,6 +36,8 @@ import { useTheme } from 'styled-components'
 import { formatCurrencyAmount } from 'utils/formatCurrencyAmount'
 import { unwrappedToken } from 'utils/unwrappedToken'
 
+import { isAddress } from 'utilities/src/addresses'
+import { MigrateHeader } from '.'
 import { AutoColumn } from '../../components/Column'
 import FormattedCurrencyAmount from '../../components/FormattedCurrencyAmount'
 import CurrencyLogo from '../../components/Logo/CurrencyLogo'
@@ -49,12 +50,10 @@ import { useTotalSupply } from '../../hooks/useTotalSupply'
 import { useTokenBalance } from '../../state/connection/hooks'
 import { TransactionType } from '../../state/transactions/types'
 import { BackArrowLink, ExternalLink, ThemedText } from '../../theme/components'
-import { isAddress } from '../../utils'
 import { calculateGasMargin } from '../../utils/calculateGasMargin'
 import { currencyId } from '../../utils/currencyId'
 import { ExplorerDataType, getExplorerLink } from '../../utils/getExplorerLink'
 import { BodyWrapper } from '../AppBody'
-import { MigrateHeader } from '.'
 
 const ZERO = JSBI.BigInt(0)
 
@@ -135,8 +134,7 @@ function V2PairMigration({
   const pairFactory = useSingleCallResult(pair, 'factory')
   const isNotUniswap = pairFactory.result?.[0] && pairFactory.result[0] !== v2FactoryAddress
 
-  const deadline = useTransactionDeadline() // custom from users settings
-  const blockTimestamp = useCurrentBlockTimestamp()
+  const getDeadline = useGetTransactionDeadline() // custom from users settings
   const allowedSlippage = useUserSlippageToleranceWithDefault(DEFAULT_MIGRATE_SLIPPAGE_TOLERANCE) // custom from users
 
   const currency0 = unwrappedToken(token0)
@@ -269,12 +267,10 @@ function V2PairMigration({
 
   const networkSupportsV2 = useNetworkSupportsV2()
 
-  const migrate = useCallback(() => {
+  const migrate = useCallback(async () => {
     if (
       !migrator ||
       !account ||
-      !deadline ||
-      !blockTimestamp ||
       typeof tickLower !== 'number' ||
       typeof tickUpper !== 'number' ||
       !v3Amount0Min ||
@@ -284,7 +280,8 @@ function V2PairMigration({
     )
       return
 
-    const deadlineToUse = signatureData?.deadline ?? deadline
+    const deadline = signatureData?.deadline ?? (await getDeadline())
+    if (!deadline) throw new Error('could not get deadline')
 
     const data: string[] = []
 
@@ -294,7 +291,7 @@ function V2PairMigration({
         migrator.interface.encodeFunctionData('selfPermit', [
           pair.address,
           `0x${pairBalance.quotient.toString(16)}`,
-          deadlineToUse,
+          deadline,
           signatureData.v,
           signatureData.r,
           signatureData.s,
@@ -329,7 +326,7 @@ function V2PairMigration({
           amount0Min: `0x${v3Amount0Min.toString(16)}`,
           amount1Min: `0x${v3Amount1Min.toString(16)}`,
           recipient: account,
-          deadline: deadlineToUse,
+          deadline,
           refundAsETH: true, // hard-code this for now
         },
       ])
@@ -364,8 +361,6 @@ function V2PairMigration({
   }, [
     migrator,
     account,
-    deadline,
-    blockTimestamp,
     tickLower,
     tickUpper,
     v3Amount0Min,
@@ -373,6 +368,7 @@ function V2PairMigration({
     chainId,
     networkSupportsV2,
     signatureData,
+    getDeadline,
     noLiquidity,
     pair.address,
     pairBalance.quotient,
@@ -393,11 +389,11 @@ function V2PairMigration({
 
   return (
     <AutoColumn gap="20px">
-      <ThemedText.DeprecatedBody my={9} style={{ fontWeight: 485 }}>
+      <ThemedText.DeprecatedBody my={9} style={{ fontWeight: 485, textAlign: 'center' }}>
         <Trans>
-          This tool will safely migrate your {isNotUniswap ? 'SushiSwap' : 'V2'} liquidity to V3. The process is
-          completely trustless thanks to the{' '}
-        </Trans>
+          This tool will safely migrate your <Select value={isNotUniswap} _true="SushiSwap" _false="V2" other="V2" />{' '}
+          liquidity to V3. The process is completely trustless thanks to the
+        </Trans>{' '}
         {chainId && migrator && (
           <ExternalLink href={getExplorerLink(chainId, migrator.address, ExplorerDataType.ADDRESS)}>
             <ThemedText.DeprecatedBlue display="inline">
@@ -419,7 +415,7 @@ function V2PairMigration({
                 </Trans>
               </ThemedText.DeprecatedMediumHeader>
             </RowFixed>
-            <Badge variant={BadgeVariant.WARNING}>{isNotUniswap ? 'Sushi' : 'V2'}</Badge>
+            <Badge>{isNotUniswap ? 'Sushi' : 'V2'}</Badge>
           </RowBetween>
           <LiquidityInfo token0Amount={token0Value} token1Amount={token1Value} />
         </AutoColumn>
@@ -440,7 +436,7 @@ function V2PairMigration({
                 </Trans>
               </ThemedText.DeprecatedMediumHeader>
             </RowFixed>
-            <Badge variant={BadgeVariant.PRIMARY}>V3</Badge>
+            <Badge>V3</Badge>
           </RowBetween>
 
           <FeeSelector feeAmount={feeAmount} handleFeePoolSelect={setFeeAmount} />
@@ -618,7 +614,6 @@ function V2PairMigration({
             {!isSuccessfullyMigrated && !isMigrationPending ? (
               <AutoColumn gap="md" style={{ flex: '1' }}>
                 <ButtonConfirmed
-                  confirmed={approval === ApprovalState.APPROVED || signatureData !== null}
                   disabled={
                     approval !== ApprovalState.NOT_APPROVED ||
                     signatureData !== null ||

@@ -1,7 +1,7 @@
 import { Trans } from '@lingui/macro'
 import { BrowserEvent, InterfaceElementName, InterfaceEventName } from '@uniswap/analytics-events'
 import { useWeb3React } from '@web3-react/core'
-import { sendAnalyticsEvent, TraceEvent } from 'analytics'
+import { TraceEvent, sendAnalyticsEvent } from 'analytics'
 import PortfolioDrawer from 'components/AccountDrawer'
 import { usePendingActivity } from 'components/AccountDrawer/MiniPortfolio/Activity/hooks'
 import { useAccountDrawer } from 'components/AccountDrawer/MiniPortfolio/hooks'
@@ -15,16 +15,16 @@ import useENSName from 'hooks/useENSName'
 import useLast from 'hooks/useLast'
 import { navSearchInputVisibleSize } from 'hooks/useScreenSize'
 import { Portal } from 'nft/components/common/Portal'
-import { useIsNftClaimAvailable } from 'nft/hooks/useIsNftClaimAvailable'
 import { darken } from 'polished'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useAppDispatch, useAppSelector } from 'state/hooks'
 import { updateRecentConnectionMeta } from 'state/user/reducer'
 import styled from 'styled-components'
-import { colors } from 'theme/colors'
 import { flexRowNoWrap } from 'theme/styles'
-import { shortenAddress } from 'utils'
+import { shortenAddress } from 'utilities/src/addresses'
 
+import { Icons } from 'ui/src'
+import { useUnitagByAddressWithoutFlag } from 'uniswap/src/features/unitags/hooksWithoutFlags'
 import { ButtonSecondary } from '../Button'
 import StatusIcon from '../Identicon/StatusIcon'
 import { RowBetween } from '../Row'
@@ -73,12 +73,10 @@ const Web3StatusConnectWrapper = styled.div`
 
 const Web3StatusConnected = styled(Web3StatusGeneric)<{
   pending?: boolean
-  isClaimAvailable?: boolean
 }>`
   background-color: ${({ pending, theme }) => (pending ? theme.accent1 : theme.surface1)};
   border: 1px solid ${({ pending, theme }) => (pending ? theme.accent1 : theme.surface1)};
   color: ${({ pending, theme }) => (pending ? theme.white : theme.neutral1)};
-  border: ${({ isClaimAvailable }) => isClaimAvailable && `1px solid ${colors.purple300}`};
   :hover,
   :focus {
     border: 1px solid ${({ theme }) => theme.surface2};
@@ -104,21 +102,22 @@ const Web3StatusConnecting = styled(Web3StatusConnected)`
   }
 `
 
-const AddressAndChevronContainer = styled.div<{ loading?: boolean }>`
+const AddressAndChevronContainer = styled.div<{ $loading?: boolean }>`
   display: flex;
-  opacity: ${({ loading, theme }) => loading && theme.opacity.disabled};
+  opacity: ${({ $loading, theme }) => $loading && theme.opacity.disabled};
+  align-items: center;
 
   @media only screen and (max-width: ${navSearchInputVisibleSize}px) {
     display: none;
   }
 `
 
-const Text = styled.p`
+const Text = styled.span`
   flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin: 0 0.25rem 0 0.25rem;
+  margin: 0 2px;
   font-size: 1rem;
   width: fit-content;
   font-weight: 485;
@@ -143,6 +142,7 @@ function Web3StatusInner() {
   const activeWeb3 = useWeb3React()
   const lastWeb3 = useLast(useWeb3React(), ignoreWhileSwitchingChain)
   const { account, connector } = useMemo(() => (activeWeb3.account ? activeWeb3 : lastWeb3), [activeWeb3, lastWeb3])
+  const { unitag } = useUnitagByAddressWithoutFlag(account, Boolean(account))
   const { ENSName, loading: ENSLoading } = useENSName(account)
   const connection = getConnection(connector)
   const dispatch = useAppDispatch()
@@ -152,7 +152,6 @@ function Web3StatusInner() {
     sendAnalyticsEvent(InterfaceEventName.ACCOUNT_DROPDOWN_BUTTON_CLICKED)
     toggleAccountDrawer()
   }, [toggleAccountDrawer])
-  const isClaimAvailable = useIsNftClaimAvailable((state) => state.isClaimAvailable)
 
   const { hasPendingActivity, pendingActivityCount } = usePendingActivity()
 
@@ -189,7 +188,7 @@ function Web3StatusInner() {
         <IconWrapper size={24}>
           <LoaderV3 size="24px" />
         </IconWrapper>
-        <AddressAndChevronContainer loading={true}>
+        <AddressAndChevronContainer $loading={true}>
           <Text>{initialConnection.current?.ENSName ?? shortenAddress(initialConnection.current?.address)}</Text>
         </AddressAndChevronContainer>
       </Web3StatusConnecting>
@@ -208,7 +207,6 @@ function Web3StatusInner() {
           data-testid="web3-status-connected"
           onClick={handleWalletDropdownClick}
           pending={hasPendingActivity}
-          isClaimAvailable={isClaimAvailable}
         >
           {!hasPendingActivity && (
             <StatusIcon account={account} size={24} connection={connection} showMiniIcons={false} />
@@ -222,7 +220,8 @@ function Web3StatusInner() {
             </RowBetween>
           ) : (
             <AddressAndChevronContainer>
-              <Text>{ENSName ?? shortenAddress(account)}</Text>
+              <Text>{unitag?.username ?? ENSName ?? shortenAddress(account)}</Text>
+              {unitag?.username && <Icons.Unitag size={18} />}
             </AddressAndChevronContainer>
           )}
         </Web3StatusConnected>

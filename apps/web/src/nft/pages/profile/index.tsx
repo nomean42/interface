@@ -11,11 +11,11 @@ import { ProfilePage } from 'nft/components/profile/view/ProfilePage'
 import { useBag, useProfilePageState, useSellAsset, useWalletCollections } from 'nft/hooks'
 import { ProfilePageStateType } from 'nft/types'
 import { useEffect, useRef } from 'react'
-import { Helmet } from 'react-helmet'
+import { Helmet } from 'react-helmet-async/lib/index'
 import styled from 'styled-components'
 import { BREAKPOINTS } from 'theme'
 import { ThemedText } from 'theme/components'
-import { shortenAddress } from 'utils'
+import { shortenAddress } from 'utilities/src/addresses'
 
 import { LIST_PAGE_MARGIN, LIST_PAGE_MARGIN_MOBILE } from './shared'
 

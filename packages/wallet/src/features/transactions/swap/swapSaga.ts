@@ -1,15 +1,14 @@
 import { providers } from 'ethers'
 import { Statsig } from 'statsig-react-native'
-import { isWeb } from 'tamagui'
 import { call, select } from 'typed-redux-saga'
+import { FeatureFlags, getFeatureFlagName } from 'uniswap/src/features/experiments/flags'
 import { logger } from 'utilities/src/logger/logger'
 import { RPCType } from 'wallet/src/constants/chains'
-import { FEATURE_FLAGS } from 'wallet/src/features/experiments/constants'
 import { isPrivateRpcSupportedOnChain } from 'wallet/src/features/providers'
 import { makeSelectAddressTransactions } from 'wallet/src/features/transactions/selectors'
 import {
-  sendTransaction,
   SendTransactionParams,
+  sendTransaction,
 } from 'wallet/src/features/transactions/sendTransactionSaga'
 import { getBaseTradeAnalyticsProperties } from 'wallet/src/features/transactions/swap/analytics'
 import { tradeToTransactionInfo } from 'wallet/src/features/transactions/swap/utils'
@@ -82,7 +81,10 @@ export function* approveAndSwap(params: SwapParams) {
 
     yield* call(sendTransaction, sendTransactionParams)
   } catch (error) {
-    logger.error(error, { tags: { file: 'swapSaga', function: 'approveAndSwap' } })
+    logger.error(error, {
+      tags: { file: 'swapSaga', function: 'approveAndSwap' },
+      extra: { analytics: params.analytics },
+    })
   }
 }
 
@@ -115,8 +117,7 @@ function* getNonceForApproveAndSwap(
 function* shouldSubmitViaPrivateRpc(chainId: number) {
   const swapProtectionSetting = yield* select(selectWalletSwapProtectionSetting)
   const swapProtectionOn = swapProtectionSetting === SwapProtectionSetting.On
-  // TODO(EXT-460): remove this once Statsig is set up in the Extension
-  const mevBlockerFeatureEnabled = isWeb ? true : Statsig.checkGate(FEATURE_FLAGS.MevBlocker)
+  const mevBlockerFeatureEnabled = Statsig.checkGate(getFeatureFlagName(FeatureFlags.MevBlocker))
   const privateRpcSupportedOnChain = chainId ? isPrivateRpcSupportedOnChain(chainId) : false
   return Boolean(swapProtectionOn && privateRpcSupportedOnChain && mevBlockerFeatureEnabled)
 }

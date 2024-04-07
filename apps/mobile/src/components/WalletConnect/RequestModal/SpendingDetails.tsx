@@ -9,7 +9,7 @@ import { useUSDValue } from 'wallet/src/features/gas/hooks'
 import { useLocalizationContext } from 'wallet/src/features/language/LocalizationContext'
 import { useNativeCurrencyInfo } from 'wallet/src/features/tokens/useCurrencyInfo'
 import { getSymbolDisplayText } from 'wallet/src/utils/currency'
-import { getCurrencyAmount, ValueType } from 'wallet/src/utils/getCurrencyAmount'
+import { ValueType, getCurrencyAmount } from 'wallet/src/utils/getCurrencyAmount'
 
 export function SpendingDetails({
   value,
@@ -31,19 +31,22 @@ export function SpendingDetails({
     : null
   const usdValue = useUSDValue(chainId, value)
 
+  const tokenAmountWithSymbol =
+    formatCurrencyAmount({ value: nativeCurrencyAmount, type: NumberType.TokenTx }) +
+    ' ' +
+    getSymbolDisplayText(nativeCurrencyInfo?.currency.symbol)
+  const fiatAmount = convertFiatAmountFormatted(usdValue, NumberType.FiatTokenPrice)
+
   return (
     <Flex row alignItems="center" gap="$spacing16">
       <Text color="$neutral2" variant="body2">
-        {t('Sending')}:
+        {t('walletConnect.request.details.label.sending')}
       </Text>
       <Flex row alignItems="center" gap="$spacing4">
         <CurrencyLogo currencyInfo={nativeCurrencyInfo} size={iconSizes.icon16} />
-        <Text variant="subheading2">
-          {formatCurrencyAmount({ value: nativeCurrencyAmount, type: NumberType.TokenTx })}{' '}
-          {getSymbolDisplayText(nativeCurrencyInfo?.currency.symbol)}
-        </Text>
+        <Text variant="subheading2">{tokenAmountWithSymbol}</Text>
         <Text color="$neutral2" loading={!usdValue} variant="subheading2">
-          ({convertFiatAmountFormatted(usdValue, NumberType.FiatTokenPrice)})
+          {fiatAmount}
         </Text>
       </Flex>
     </Flex>

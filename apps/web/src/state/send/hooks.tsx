@@ -1,7 +1,7 @@
 import { TransactionRequest } from '@ethersproject/abstract-provider'
 import { Currency, CurrencyAmount } from '@uniswap/sdk-core'
 import { useWeb3React } from '@web3-react/core'
-import { nativeOnChain } from 'constants/tokens'
+import { NATIVE_CHAIN_ID, nativeOnChain } from 'constants/tokens'
 import { useCurrency } from 'hooks/Tokens'
 import useENSAddress from 'hooks/useENSAddress'
 import useENSName from 'hooks/useENSName'
@@ -11,12 +11,17 @@ import { useCurrencyBalances } from 'lib/hooks/useCurrencyBalance'
 import tryParseCurrencyAmount from 'lib/utils/tryParseCurrencyAmount'
 import { useMemo } from 'react'
 import { SendState } from 'state/send/SendContext'
-import { isAddress } from 'utils'
+import {
+  useUnitagByAddressWithoutFlag,
+  useUnitagByNameWithoutFlag,
+} from 'uniswap/src/features/unitags/hooksWithoutFlags'
+import { isAddress } from 'utilities/src/addresses'
 import { useCreateTransferTransaction } from 'utils/transfer'
 
 export interface RecipientData {
   address: string
   ensName?: string
+  unitag?: string
 }
 
 export enum SendInputError {
@@ -38,26 +43,48 @@ export function useDerivedSendInfo(state: SendState): SendInfo {
   const { account, chainId, provider } = useWeb3React()
   const { exactAmountToken, exactAmountFiat, inputInFiat, inputCurrency, recipient, validatedRecipientData } = state
 
+  const { unitag: recipientInputUnitag } = useUnitagByNameWithoutFlag(
+    validatedRecipientData ? undefined : recipient,
+    Boolean(recipient)
+  )
+  const recipientInputUnitagUsername = validatedRecipientData?.unitag ?? recipientInputUnitag?.username
+  const recipientInputUnitagAddress = recipientInputUnitag?.address?.address
   const { address: recipientInputEnsAddress } = useENSAddress(validatedRecipientData ? undefined : recipient)
   const validatedRecipientAddress = useMemo(() => {
     if (validatedRecipientData) {
       return validatedRecipientData.address
     }
-    return isAddress(recipient) || isAddress(recipientInputEnsAddress) || undefined
-  }, [recipient, recipientInputEnsAddress, validatedRecipientData])
+    return (
+      isAddress(recipient) || isAddress(recipientInputEnsAddress) || isAddress(recipientInputUnitagAddress) || undefined
+    )
+  }, [recipient, recipientInputEnsAddress, recipientInputUnitagAddress, validatedRecipientData])
+
+  const { unitag } = useUnitagByAddressWithoutFlag(
+    recipientInputUnitagUsername ? undefined : validatedRecipientAddress,
+    Boolean(validatedRecipientAddress)
+  )
   const { ENSName } = useENSName(validatedRecipientData?.ensName ? undefined : validatedRecipientAddress)
   const recipientData = useMemo(() => {
     if (validatedRecipientAddress) {
       return {
         address: validatedRecipientAddress,
         ensName: recipientInputEnsAddress ? recipient : validatedRecipientData?.ensName ?? ENSName ?? undefined,
+        unitag: recipientInputUnitagUsername ?? unitag?.username,
       }
     }
 
     return undefined
-  }, [ENSName, recipient, recipientInputEnsAddress, validatedRecipientData?.ensName, validatedRecipientAddress])
+  }, [
+    validatedRecipientAddress,
+    recipientInputEnsAddress,
+    recipient,
+    validatedRecipientData?.ensName,
+    ENSName,
+    recipientInputUnitagUsername,
+    unitag?.username,
+  ])
 
-  const nativeCurrency = useCurrency('ETH')
+  const nativeCurrency = useCurrency(NATIVE_CHAIN_ID)
   const [inputCurrencyBalance, nativeCurencyBalance] = useCurrencyBalances(
     account,
     useMemo(() => [inputCurrency, nativeCurrency], [inputCurrency, nativeCurrency])

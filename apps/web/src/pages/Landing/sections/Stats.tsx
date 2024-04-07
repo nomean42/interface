@@ -1,27 +1,26 @@
 import { t, Trans } from '@lingui/macro'
 import Row from 'components/Row'
-import { ProtocolVersion, useDailyProtocolVolumeQuery } from 'graphql/data/__generated__/types-and-hooks'
 import { useMemo } from 'react'
 import { ArrowRightCircle } from 'react-feather'
 import styled from 'styled-components'
 import { ClickableStyle, ExternalLink } from 'theme/components'
+import {
+  ProtocolVersion,
+  useDailyProtocolVolumeQuery,
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import { NumberType, useFormatter } from 'utils/formatNumbers'
 
 import { Body1, Box, H2 } from '../components/Generics'
 import { StatCard } from '../components/StatCard'
 import { useInView } from './useInView'
 
-const SectionLayout = styled.div`
+const Container = styled.div`
   width: 100%;
-  max-width: 1280px;
-  max-height: 480px;
+  max-width: 1360px;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 0 40px;
-  @media (max-width: 1024px) {
-    padding: 0 48px;
-  }
 
   @media (max-width: 960px) {
     max-height: 360px;
@@ -34,6 +33,10 @@ const SectionLayout = styled.div`
   @media (max-width: 468px) {
     padding: 0 24px;
   }
+`
+const SectionLayout = styled(Box)`
+  width: 100%;
+  max-width: 1280px;
 `
 const HideWhenLarge = styled(Box)`
   @media (min-width: 768px) {
@@ -158,38 +161,40 @@ export function Stats() {
   const { ref, inView } = useInView()
 
   return (
-    <SectionLayout ref={ref}>
-      <HideWhenSmall>
-        <Layout>
-          <Left>
-            <Box direction="column" justify-content="space-between" height="100%">
-              <H2>
-                <Trans>Trusted by millions</Trans>
-              </H2>
-              <Box bottom="0" position="absolute" direction="column" maxWidth="480px" gap="24px">
-                <Body1>
-                  <ProtocolDescription />
-                </Body1>
-                <LearnMore />
+    <Container>
+      <SectionLayout ref={ref}>
+        <HideWhenSmall>
+          <Layout>
+            <Left>
+              <Box direction="column" justify-content="space-between" height="100%">
+                <H2>
+                  <Trans>Trusted by millions</Trans>
+                </H2>
+                <Box bottom="0" position="absolute" direction="column" maxWidth="480px" gap="24px">
+                  <Body1>
+                    <ProtocolDescription />
+                  </Body1>
+                  <LearnMore />
+                </Box>
               </Box>
-            </Box>
-          </Left>
-          <Right>
-            <Cards inView={inView} />
-          </Right>
-        </Layout>
-      </HideWhenSmall>
-      <HideWhenLarge maxWidth="1280px" direction="column" gap="32px">
-        <H2>
-          <Trans>Trusted by millions</Trans>
-        </H2>
-        <Cards inView={inView} />
-        <Body1>
-          <ProtocolDescription />
-        </Body1>
-        <LearnMore />
-      </HideWhenLarge>
-    </SectionLayout>
+            </Left>
+            <Right>
+              <Cards inView={inView} />
+            </Right>
+          </Layout>
+        </HideWhenSmall>
+        <HideWhenLarge maxWidth="1280px" direction="column" gap="32px">
+          <H2>
+            <Trans>Trusted by millions</Trans>
+          </H2>
+          <Cards inView={inView} />
+          <Body1>
+            <ProtocolDescription />
+          </Body1>
+          <LearnMore />
+        </HideWhenLarge>
+      </SectionLayout>
+    </Container>
   )
 }
 
@@ -220,18 +225,33 @@ function Cards({ inView }: { inView: boolean }) {
   return (
     <CardLayout>
       <LeftTop>
-        <StatCard title={t`All time volume`} value={t`$1.8T`} delay={0} inView={inView} />
+        <StatCard
+          title={t`All time volume`}
+          value={formatNumber({ input: 1.8 * 10 ** 12, type: NumberType.FiatTokenStats })}
+          delay={0}
+          inView={inView}
+        />
       </LeftTop>
       <RightTop>
-        <StatCard title={t`All time swappers`} value={t`90M`} delay={0.2} inView={inView} />
+        <StatCard
+          title={t`All time swappers`}
+          value={formatNumber({ input: 14.9 * 10 ** 6, type: NumberType.TokenQuantityStats })}
+          delay={0.2}
+          inView={inView}
+        />
       </RightTop>
       <LeftBottom>
-        <StatCard title={t`All time LP fees `} value={t`$3.2B`} delay={0.4} inView={inView} />
+        <StatCard
+          title={t`All time LP fees `}
+          value={formatNumber({ input: 3.2 * 10 ** 9, type: NumberType.FiatTokenStats })}
+          delay={0.4}
+          inView={inView}
+        />
       </LeftBottom>
       <RightBottom>
         <StatCard
           title={t`24H volume`}
-          value={formatNumber({ input: totalVolume, type: NumberType.FiatTokenStats })}
+          value={formatNumber({ input: totalVolume || 500000000, type: NumberType.FiatTokenStats })}
           live
           delay={0.6}
           inView={inView}

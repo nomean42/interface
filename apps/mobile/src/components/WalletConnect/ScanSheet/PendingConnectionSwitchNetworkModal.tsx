@@ -5,7 +5,7 @@ import Check from 'ui/src/assets/icons/check.svg'
 import { iconSizes } from 'ui/src/theme'
 import { NetworkLogo } from 'wallet/src/components/CurrencyLogo/NetworkLogo'
 import { ActionSheetModal } from 'wallet/src/components/modals/ActionSheetModal'
-import { ALL_SUPPORTED_CHAIN_IDS, ChainId, CHAIN_INFO } from 'wallet/src/constants/chains'
+import { ALL_SUPPORTED_CHAIN_IDS, CHAIN_INFO, ChainId } from 'wallet/src/constants/chains'
 import { ElementName, ModalName } from 'wallet/src/telemetry/constants'
 
 type Props = {
@@ -63,7 +63,7 @@ export const PendingConnectionSwitchNetworkModal = ({
     <ActionSheetModal
       header={
         <Flex centered gap="$spacing4" py="$spacing16">
-          <Text variant="buttonLabel2">{t('Switch Network')}</Text>
+          <Text variant="buttonLabel2">{t('walletConnect.pending.switchNetwork')}</Text>
         </Flex>
       }
       isVisible={true}

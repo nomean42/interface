@@ -2,7 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { BlurView } from 'expo-blur'
 import React, { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alert, Image, Platform, StyleSheet } from 'react-native'
+import { ActivityIndicator, Alert, Image, Platform, StyleSheet } from 'react-native'
 import { useAppDispatch } from 'src/app/hooks'
 import { OnboardingStackParamList } from 'src/app/navigation/types'
 import { BiometricAuthWarningModal } from 'src/components/Settings/BiometricAuthWarningModal'
@@ -18,19 +18,19 @@ import {
   useDeviceSupportsBiometricAuth,
 } from 'src/features/biometrics/hooks'
 import { setRequiredForTransactions } from 'src/features/biometrics/slice'
-import { useCompleteOnboardingCallback } from 'src/features/onboarding/hooks'
 import { OnboardingScreen } from 'src/features/onboarding/OnboardingScreen'
+import { useCompleteOnboardingCallback } from 'src/features/onboarding/hooks'
 import { OnboardingScreens } from 'src/screens/Screens'
 import { Button, Flex, Text, TouchableArea, useIsDarkMode, useSporeColors } from 'ui/src'
 import { SECURITY_SCREEN_BACKGROUND_DARK, SECURITY_SCREEN_BACKGROUND_LIGHT } from 'ui/src/assets'
 import FaceIcon from 'ui/src/assets/icons/faceid-thin.svg'
 import FingerprintIcon from 'ui/src/assets/icons/fingerprint.svg'
 import { borderRadii, imageSizes } from 'ui/src/theme'
+import { isIOS } from 'uniswap/src/utils/platform'
 import { ImportType } from 'wallet/src/features/onboarding/types'
 import { ElementName } from 'wallet/src/telemetry/constants'
 import { opacify } from 'wallet/src/utils/colors'
 import { openSettings } from 'wallet/src/utils/linking'
-import { isIOS } from 'wallet/src/utils/platform'
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, OnboardingScreens.Security>
 
@@ -40,16 +40,20 @@ export function SecuritySetupScreen({ route: { params } }: Props): JSX.Element {
   const dispatch = useAppDispatch()
   const isDarkMode = useIsDarkMode()
 
+  const [isLoadingAccount, setIsLoadingAccount] = useState(false)
   const [showWarningModal, setShowWarningModal] = useState(false)
   const { touchId: isTouchIdDevice } = useDeviceSupportsBiometricAuth()
-  const authenticationTypeName = useBiometricName(isTouchIdDevice)
+  const biometricsMethod = useBiometricName(isTouchIdDevice)
 
-  const onCompleteOnboarding = useCompleteOnboardingCallback(params.entryPoint, params.importType)
+  const onCompleteOnboarding = useCompleteOnboardingCallback(params)
 
   const onPressNext = useCallback(async () => {
-    setShowWarningModal(false)
-    await onCompleteOnboarding()
-  }, [onCompleteOnboarding])
+    if (!isLoadingAccount) {
+      setShowWarningModal(false)
+      setIsLoadingAccount(true)
+      await onCompleteOnboarding()
+    }
+  }, [isLoadingAccount, onCompleteOnboarding])
 
   const onMaybeLaterPressed = useCallback(async () => {
     if (params?.importType === ImportType.Watch) {
@@ -62,27 +66,28 @@ export function SecuritySetupScreen({ route: { params } }: Props): JSX.Element {
   const onPressEnableSecurity = useCallback(async () => {
     const authStatus = await tryLocalAuthenticate()
 
-    const authTypeCapitalized =
-      authenticationTypeName.charAt(0).toUpperCase() + authenticationTypeName.slice(1)
-
     if (
       authStatus === BiometricAuthenticationStatus.Unsupported ||
       authStatus === BiometricAuthenticationStatus.MissingEnrollment
     ) {
       isIOS
         ? Alert.alert(
-            t('{{authTypeCapitalized}} is disabled', { authTypeCapitalized }),
-            t('To use {{authenticationTypeName}}, allow access in system settings', {
-              authenticationTypeName,
+            t('onboarding.security.alert.biometrics.title.ios', { biometricsMethod }),
+            t('onboarding.security.alert.biometrics.message.ios', {
+              biometricsMethod,
             }),
-            [{ text: t('Go to settings'), onPress: openSettings }, { text: t('Not now') }]
+            [
+              { text: t('common.navigation.systemSettings'), onPress: openSettings },
+              { text: t('common.button.notNow') },
+            ]
           )
         : Alert.alert(
-            t('{{authTypeCapitalized}} is disabled', { authTypeCapitalized }),
-            t('To use {{authenticationTypeName}}, set up it first in settings', {
-              authenticationTypeName,
-            }),
-            [{ text: t('Set up'), onPress: enroll }, { text: t('Not now') }]
+            t('onboarding.security.alert.biometrics.title.android'),
+            t('onboarding.security.alert.biometrics.message.android'),
+            [
+              { text: t('onboarding.security.button.setup'), onPress: enroll },
+              { text: t('common.button.notNow') },
+            ]
           )
     }
 
@@ -90,7 +95,7 @@ export function SecuritySetupScreen({ route: { params } }: Props): JSX.Element {
       dispatch(setRequiredForTransactions(true))
       await onPressNext()
     }
-  }, [t, authenticationTypeName, dispatch, onPressNext])
+  }, [t, biometricsMethod, dispatch, onPressNext])
 
   const onCloseModal = useCallback(() => setShowWarningModal(false), [])
 
@@ -103,15 +108,27 @@ export function SecuritySetupScreen({ route: { params } }: Props): JSX.Element {
           onConfirm={onPressNext}
         />
       )}
+      {isLoadingAccount && (
+        <Flex
+          centered
+          mt="$spacing60"
+          position="absolute"
+          pt="$spacing36"
+          width="100%"
+          zIndex={100}>
+          <ActivityIndicator color={colors.sporeWhite.val} />
+        </Flex>
+      )}
       <OnboardingScreen
         childrenGap="$none"
-        subtitle={t(
-          'Add an extra layer of security by requiring {{ authenticationTypeName }} to send transactions.',
-          {
-            authenticationTypeName,
-          }
-        )}
-        title={t('Protect your wallet')}>
+        subtitle={
+          isIOS
+            ? t('onboarding.security.subtitle.ios', {
+                biometricsMethod,
+              })
+            : t('onboarding.security.subtitle.android')
+        }
+        title={t('onboarding.security.title')}>
         <Flex centered shrink gap="$spacing16" my="$spacing12" position="relative" py="$spacing24">
           <Flex pt="$spacing24">
             <SecurityBackgroundImage />
@@ -149,17 +166,17 @@ export function SecuritySetupScreen({ route: { params } }: Props): JSX.Element {
         </Flex>
         <Flex gap="$spacing24">
           <Trace logPress element={ElementName.Skip}>
-            <TouchableArea onPress={onMaybeLaterPressed}>
+            <TouchableArea testID={ElementName.Skip} onPress={onMaybeLaterPressed}>
               <Text color="$accent1" textAlign="center" variant="buttonLabel2">
-                {t('Maybe later')}
+                {t('common.button.later')}
               </Text>
             </TouchableArea>
           </Trace>
           <Trace logPress element={ElementName.Enable}>
             <Button theme="primary" onPress={onPressEnableSecurity}>
-              {t('Enable', {
-                authenticationTypeName,
-              })}
+              {isIOS
+                ? t('onboarding.security.button.confirm.ios', { biometricsMethod })
+                : t('onboarding.security.button.confirm.android')}
             </Button>
           </Trace>
         </Flex>

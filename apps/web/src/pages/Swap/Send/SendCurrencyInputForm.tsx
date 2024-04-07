@@ -13,15 +13,19 @@ import CurrencySearchModal from 'components/SearchModal/CurrencySearchModal'
 import { useActiveLocalCurrency, useActiveLocalCurrencyComponents } from 'hooks/useActiveLocalCurrency'
 import { STABLECOIN_AMOUNT_OUT } from 'hooks/useStablecoinPrice'
 import { useUSDPrice } from 'hooks/useUSDPrice'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react'
 import { SendInputError } from 'state/send/hooks'
 import { useSendContext } from 'state/send/SendContext'
-import { CurrencyState, useSwapAndLimitContext } from 'state/swap/SwapContext'
 import styled, { css } from 'styled-components'
 import { ClickableStyle, ThemedText } from 'theme/components'
+import { Text } from 'ui/src'
 import { NumberType, useFormatter } from 'utils/formatNumbers'
 import { maxAmountSpend } from 'utils/maxAmountSpend'
 
+import { asSupportedChain, SupportedInterfaceChain } from 'constants/chains'
+import { useSwapAndLimitContext } from 'state/swap/hooks'
+import { CurrencyState } from 'state/swap/types'
+import useResizeObserver from 'use-resize-observer'
 import { ReactComponent as DropDown } from '../../../assets/images/dropdown.svg'
 
 const Wrapper = styled(Column)<{ $disabled: boolean }>`
@@ -51,7 +55,7 @@ const InputWrapper = styled(Column)`
   height: 256px;
   align-items: center;
   justify-content: flex-end;
-  gap: 16px;
+  gap: 4px;
   border-radius: 16px 16px 0px 0px;
 `
 const InputLabelContainer = styled.div`
@@ -60,13 +64,46 @@ const InputLabelContainer = styled.div`
   left: 16px;
 `
 
-const StyledNumericalInput = styled(NumericalInput)<{ usePercent?: boolean }>`
-  max-height: 60px;
-  width: 100%;
-  text-align: center;
+const NumericalInputFontStyle = css`
+  text-align: left;
   font-size: 70px;
   font-weight: 500;
   line-height: 60px;
+`
+
+const NumericalInputWrapper = styled(Row)`
+  position: relative;
+  max-width: 100%;
+  width: max-content;
+`
+
+const StyledNumericalInput = styled(NumericalInput)<{ $width?: number }>`
+  max-height: 84px;
+  max-width: 100%;
+  width: ${({ $width }) => `${$width ?? 43}px`}; // this value is from the size of a 0 which is the default value
+  ${NumericalInputFontStyle}
+
+  ::placeholder {
+    opacity: 1;
+  }
+`
+
+const NumericalInputMimic = styled.span`
+  position: absolute;
+  visibility: hidden;
+  bottom: 0px;
+  right: 0px;
+  ${NumericalInputFontStyle}
+`
+
+const NumericalInputSymbolContainer = styled.span<{ showPlaceholder: boolean }>`
+  user-select: none;
+  ${NumericalInputFontStyle}
+  ${({ showPlaceholder }) =>
+    showPlaceholder &&
+    css`
+      color: ${({ theme }) => theme.neutral3};
+    `}
 `
 
 const StyledUpAndDownArrowIcon = styled(ReverseArrow)`
@@ -204,7 +241,10 @@ export default function SendCurrencyInputForm({
   const showMaxButton = Boolean(maxInputAmount?.greaterThan(0) && !parsedTokenAmount?.equalTo(maxInputAmount))
 
   const [tokenSelectorOpen, setTokenSelectorOpen] = useState(false)
-  const fiatCurrency = useMemo(() => STABLECOIN_AMOUNT_OUT[chainId ?? ChainId.MAINNET].currency, [chainId])
+  const fiatCurrency = useMemo(
+    () => STABLECOIN_AMOUNT_OUT[asSupportedChain(chainId) ?? (ChainId.MAINNET as SupportedInterfaceChain)].currency,
+    [chainId]
+  )
   const fiatCurrencyEqualsTransferCurrency = !!inputCurrency && fiatCurrency.equals(inputCurrency)
 
   const formattedBalance = formatCurrencyAmount({
@@ -213,6 +253,15 @@ export default function SendCurrencyInputForm({
   })
 
   const fiatBalanceValue = useUSDPrice(currencyBalance, inputCurrency)
+  const displayValue = inputInFiat ? exactAmountFiat : exactAmountToken
+  const hiddenObserver = useResizeObserver<HTMLElement>()
+  const [postWidthAdjustedDisplayValue, setPostWidthAdjustedDisplayValue] = useState('')
+
+  // Doing this to set the value the user is seeing once the width of the
+  // hidden element is known (after 1 render) so users don't see a weird jump
+  useLayoutEffect(() => {
+    requestAnimationFrame(() => setPostWidthAdjustedDisplayValue(displayValue))
+  }, [displayValue])
 
   const handleUserInput = useCallback(
     (newValue: string) => {
@@ -276,21 +325,35 @@ export default function SendCurrencyInputForm({
     }
   }, [maxInputAmount, setSendState])
 
+  const currencyFilters = useMemo(
+    () => ({
+      onlyShowCurrenciesWithBalance: Boolean(account),
+    }),
+    [account]
+  )
+
   return (
     <Wrapper $disabled={disabled}>
       <InputWrapper>
         <InputLabelContainer>
-          <ThemedText.SubHeaderSmall color="neutral2">
+          <Text variant="body3" userSelect="none" color="$neutral2">
             <Trans>You&apos;re sending</Trans>
-          </ThemedText.SubHeaderSmall>
+          </Text>
         </InputLabelContainer>
-        <StyledNumericalInput
-          value={inputInFiat ? exactAmountFiat : exactAmountToken}
-          disabled={disabled}
-          onUserInput={handleUserInput}
-          placeholder={inputInFiat ? fiatSymbol + '0' : '0'}
-          prependSymbol={inputInFiat ? fiatSymbol : undefined}
-        />
+        <NumericalInputWrapper>
+          {inputInFiat && (
+            <NumericalInputSymbolContainer showPlaceholder={!displayValue}>{fiatSymbol}</NumericalInputSymbolContainer>
+          )}
+          <StyledNumericalInput
+            value={postWidthAdjustedDisplayValue}
+            disabled={disabled}
+            onUserInput={handleUserInput}
+            placeholder="0"
+            $width={displayValue && hiddenObserver.width ? hiddenObserver.width + 1 : undefined}
+            maxDecimals={inputInFiat ? 6 : inputCurrency?.decimals}
+          />
+          <NumericalInputMimic ref={hiddenObserver.ref}>{displayValue}</NumericalInputMimic>
+        </NumericalInputWrapper>
         <AlternateCurrencyDisplay
           disabled={fiatCurrencyEqualsTransferCurrency}
           onToggle={toggleFiatInputAmountEnabled}
@@ -337,7 +400,7 @@ export default function SendCurrencyInputForm({
         onDismiss={() => setTokenSelectorOpen(false)}
         onCurrencySelect={handleSelectCurrency}
         selectedCurrency={inputCurrency}
-        onlyShowCurrenciesWithBalance={account ? true : false}
+        currencySearchFilters={currencyFilters}
       />
     </Wrapper>
   )

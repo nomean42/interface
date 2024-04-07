@@ -1,4 +1,3 @@
-import { notificationAsync } from 'expo-haptics'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FadeIn } from 'react-native-reanimated'
@@ -14,31 +13,24 @@ import {
 import { useSwapTxContext } from 'wallet/src/features/transactions/contexts/SwapTxContext'
 import { useTransactionModalContext } from 'wallet/src/features/transactions/contexts/TransactionModalContext'
 import { GasAndWarningRows } from 'wallet/src/features/transactions/swap/GasAndWarningRows'
-import { FeeOnTransferInfoModal } from 'wallet/src/features/transactions/swap/modals/FeeOnTransferInfoModal'
-import { NetworkFeeInfoModal } from 'wallet/src/features/transactions/swap/modals/NetworkFeeInfoModal'
 import { SlippageInfoModal } from 'wallet/src/features/transactions/swap/modals/SlippageInfoModal'
-import { SwapFeeInfoModal } from 'wallet/src/features/transactions/swap/modals/SwapFeeInfoModal'
 import { SwapDetails } from 'wallet/src/features/transactions/swap/SwapDetails'
 import {
   TransactionModalFooterContainer,
   TransactionModalInnerContainer,
 } from 'wallet/src/features/transactions/swap/TransactionModal'
-import { OnShowSwapFeeInfo } from 'wallet/src/features/transactions/TransactionDetails/SwapFee'
 import { ElementName, ModalName } from 'wallet/src/telemetry/constants'
 
-import { isWeb } from 'tamagui'
-import { AnimatedFlex, Button, Flex, Separator } from 'ui/src'
+import { AnimatedFlex, Button, Flex, HapticFeedback, isWeb, Separator } from 'ui/src'
 import { BackArrow } from 'ui/src/components/icons/BackArrow'
 import { iconSizes } from 'ui/src/theme'
 import { pushNotification } from 'wallet/src/features/notifications/slice'
 import { AppNotificationType } from 'wallet/src/features/notifications/types'
-import { useParsedSwapWarnings } from 'wallet/src/features/transactions/hooks/useParsedSwapWarnings'
+import { useParsedSwapWarnings } from 'wallet/src/features/transactions/hooks/useParsedTransactionWarnings'
 import { HOLD_TO_SWAP_TIMEOUT } from 'wallet/src/features/transactions/swap/HoldToSwapProgressCircle'
-import {
-  useAcceptedTrade,
-  useSwapCallback,
-  useWrapCallback,
-} from 'wallet/src/features/transactions/swap/hooks'
+import { useAcceptedTrade } from 'wallet/src/features/transactions/swap/trade/hooks/useAcceptedTrade'
+import { useSwapCallback } from 'wallet/src/features/transactions/swap/trade/hooks/useSwapCallback'
+import { useWrapCallback } from 'wallet/src/features/transactions/swap/trade/hooks/useWrapCallback'
 import { TransactionAmountsReview } from 'wallet/src/features/transactions/swap/TransactionAmountsReview'
 import { getActionName, isWrapAction } from 'wallet/src/features/transactions/swap/utils'
 import { TransactionDetails } from 'wallet/src/features/transactions/TransactionDetails/TransactionDetails'
@@ -54,15 +46,11 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
 
   const account = useActiveAccountWithThrow()
   const [showWarningModal, setShowWarningModal] = useState(false)
-  const [showNetworkFeeInfoModal, setShowNetworkFeeInfoModal] = useState(false)
-  const [showSwapFeeInfoModal, setShowSwapFeeInfoModal] = useState(false)
-  const [noSwapFee, setNoSwapFee] = useState(false)
   const [showSlippageModal, setShowSlippageModal] = useState(false)
-  const [showFOTInfoModal, setShowFOTInfoModal] = useState(false)
   const [warningAcknowledged, setWarningAcknowledged] = useState(false)
   const [shouldSubmitTx, setShouldSubmitTx] = useState(false)
 
-  const { handleContentLayout, bottomSheetViewStyles, onClose, BiometricsIcon, authTrigger } =
+  const { bottomSheetViewStyles, onClose, BiometricsIcon, authTrigger } =
     useTransactionModalContext()
 
   const { screen, screenRef, setScreen } = useSwapScreenContext()
@@ -176,9 +164,7 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
   const onSubmitTransaction = useCallback(async () => {
     updateSwapForm({ isSubmitting: true })
 
-    if (!isWeb) {
-      await notificationAsync()
-    }
+    await HapticFeedback.success()
 
     if (authTrigger) {
       await authTrigger({
@@ -286,31 +272,6 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
     setShowSlippageModal(false)
   }, [])
 
-  const onShowFOTInfo = useCallback(() => {
-    setShowFOTInfoModal(true)
-  }, [])
-
-  const onCloseFOTInfo = useCallback(() => {
-    setShowFOTInfoModal(false)
-  }, [])
-
-  const onShowNetworkFeeInfo = useCallback(() => {
-    setShowNetworkFeeInfoModal(true)
-  }, [])
-
-  const onShowSwapFeeInfo = useCallback<OnShowSwapFeeInfo>((_noSwapFee: boolean) => {
-    setShowSwapFeeInfoModal(true)
-    setNoSwapFee(_noSwapFee)
-  }, [])
-
-  const onCloseNetworkFeeInfo = useCallback(() => {
-    setShowNetworkFeeInfoModal(false)
-  }, [])
-
-  const onCloseSwapFeeInfo = useCallback(() => {
-    setShowSwapFeeInfoModal(false)
-  }, [])
-
   // Flag review screen user behavior, used to show hold to swap tip
   const hasViewedReviewScreen = useAppSelector(selectHasViewedReviewScreen)
   useEffect(() => {
@@ -352,13 +313,12 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
     <>
       <TransactionModalInnerContainer
         bottomSheetViewStyles={bottomSheetViewStyles}
-        fullscreen={false}
-        onLayout={handleContentLayout}>
+        fullscreen={false}>
         {showWarningModal && reviewScreenWarning?.warning.title && (
           <WarningModal
             caption={reviewScreenWarning.warning.message}
-            closeText={blockingWarning ? undefined : t('Cancel')}
-            confirmText={blockingWarning ? t('OK') : t('Confirm')}
+            closeText={blockingWarning ? undefined : t('common.button.cancel')}
+            confirmText={blockingWarning ? t('common.button.ok') : t('common.button.confirm')}
             modalName={ModalName.SwapWarning}
             severity={reviewScreenWarning.warning.severity}
             title={reviewScreenWarning.warning.title}
@@ -374,6 +334,7 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
               <TransactionAmountsReview
                 acceptedDerivedSwapInfo={acceptedDerivedSwapInfo}
                 newTradeRequiresAcceptance={newTradeRequiresAcceptance}
+                onClose={onPrev}
               />
 
               <Separator mb="$spacing24" mt="$spacing16" />
@@ -394,18 +355,11 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
               />
             )}
 
-            {showFOTInfoModal && <FeeOnTransferInfoModal onClose={onCloseFOTInfo} />}
-
-            {showNetworkFeeInfoModal && <NetworkFeeInfoModal onClose={onCloseNetworkFeeInfo} />}
-
-            {showSwapFeeInfoModal && (
-              <SwapFeeInfoModal noFee={noSwapFee} onClose={onCloseSwapFeeInfo} />
-            )}
-
-            <AnimatedFlex entering={FadeIn} gap="$spacing16">
+            <AnimatedFlex entering={FadeIn} gap="$spacing16" pt={isWeb ? '$spacing8' : undefined}>
               <TransactionAmountsReview
                 acceptedDerivedSwapInfo={acceptedDerivedSwapInfo}
                 newTradeRequiresAcceptance={newTradeRequiresAcceptance}
+                onClose={onPrev}
               />
 
               {isWrap ? (
@@ -413,8 +367,6 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
                   chainId={chainId}
                   gasFee={gasFee}
                   warning={reviewScreenWarning?.warning}
-                  onShowNetworkFeeInfo={onShowNetworkFeeInfo}
-                  onShowSwapFeeInfo={onShowSwapFeeInfo}
                   onShowWarning={onShowWarning}
                 />
               ) : (
@@ -428,10 +380,7 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
                   outputCurrencyPricePerUnitExact={outputCurrencyPricePerUnitExact}
                   warning={reviewScreenWarning?.warning}
                   onAcceptTrade={onAcceptTrade}
-                  onShowFOTInfo={onShowFOTInfo}
-                  onShowNetworkFeeInfo={onShowNetworkFeeInfo}
                   onShowSlippageModal={onShowSlippageModal}
-                  onShowSwapFeeInfo={onShowSwapFeeInfo}
                   onShowWarning={onShowWarning}
                 />
               )}
@@ -443,7 +392,9 @@ export function SwapReviewScreen({ hideContent }: { hideContent: boolean }): JSX
       {screen !== SwapScreen.SwapReviewHoldingToSwap && (
         <TransactionModalFooterContainer>
           <Flex row gap="$spacing8">
-            <Button icon={<BackArrow />} size="large" theme="tertiary" onPress={onPrev} />
+            {!isWeb && (
+              <Button icon={<BackArrow />} size="large" theme="tertiary" onPress={onPrev} />
+            )}
 
             <Button
               fill

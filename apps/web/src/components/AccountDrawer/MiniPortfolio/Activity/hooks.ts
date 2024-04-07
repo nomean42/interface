@@ -1,11 +1,15 @@
-import { TransactionStatus, useActivityQuery } from 'graphql/data/__generated__/types-and-hooks'
-import { GQL_MAINNET_CHAINS } from 'graphql/data/util'
+import { useLocalActivities } from 'components/AccountDrawer/MiniPortfolio/Activity/parseLocal'
 import { useEffect, useMemo } from 'react'
 import { usePendingOrders } from 'state/signatures/hooks'
+import { SignatureType } from 'state/signatures/types'
 import { usePendingTransactions, useTransactionCanceller } from 'state/transactions/hooks'
+import {
+  TransactionStatus,
+  useActivityWebQuery,
+} from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import { useFormatter } from 'utils/formatNumbers'
 
-import { useLocalActivities } from './parseLocal'
+import { GQL_MAINNET_CHAINS_MUTABLE } from 'graphql/data/util'
 import { parseRemoteActivities } from './parseRemote'
 import { Activity, ActivityMap } from './types'
 
@@ -58,15 +62,15 @@ function combineActivities(localMap: ActivityMap = {}, remoteMap: ActivityMap = 
 
 export function useAllActivities(account: string) {
   const { formatNumberOrString } = useFormatter()
-  const { data, loading, refetch } = useActivityQuery({
-    variables: { account, chains: GQL_MAINNET_CHAINS },
+  const { data, loading, refetch } = useActivityWebQuery({
+    variables: { account, chains: GQL_MAINNET_CHAINS_MUTABLE },
     errorPolicy: 'all',
     fetchPolicy: 'cache-first',
   })
 
   const localMap = useLocalActivities(account)
   const remoteMap = useMemo(
-    () => parseRemoteActivities(data?.portfolios?.[0].assetActivities, account, formatNumberOrString),
+    () => parseRemoteActivities(data?.portfolios?.[0]?.assetActivities, account, formatNumberOrString),
     [account, data?.portfolios, formatNumberOrString]
   )
   const updateCancelledTx = useTransactionCanceller()
@@ -84,20 +88,34 @@ export function useAllActivities(account: string) {
     })
   }, [account, localMap, remoteMap, updateCancelledTx])
 
-  const combinedActivities = useMemo(
-    () => (remoteMap ? combineActivities(localMap, remoteMap) : undefined),
-    [localMap, remoteMap]
-  )
+  const combinedActivities = useMemo(() => combineActivities(localMap, remoteMap ?? {}), [localMap, remoteMap])
 
   return { loading, activities: combinedActivities, refetch }
+}
+
+export function useOpenLimitOrders(account: string) {
+  const { activities, loading, refetch } = useAllActivities(account)
+  const openLimitOrders =
+    activities?.filter(
+      (activity) =>
+        activity.offchainOrderDetails?.type === SignatureType.SIGN_LIMIT &&
+        activity.status === TransactionStatus.Pending
+    ) ?? []
+  return {
+    openLimitOrders,
+    loading,
+    refetch,
+  }
 }
 
 export function usePendingActivity() {
   const pendingTransactions = usePendingTransactions()
   const pendingOrders = usePendingOrders()
 
-  const hasPendingActivity = pendingTransactions.length > 0 || pendingOrders.length > 0
-  const pendingActivityCount = pendingTransactions.length + pendingOrders.length
+  const pendingOrdersWithoutLimits = pendingOrders.filter((order) => order.type !== SignatureType.SIGN_LIMIT)
+
+  const hasPendingActivity = pendingTransactions.length > 0 || pendingOrdersWithoutLimits.length > 0
+  const pendingActivityCount = pendingTransactions.length + pendingOrdersWithoutLimits.length
 
   return { hasPendingActivity, pendingActivityCount }
 }

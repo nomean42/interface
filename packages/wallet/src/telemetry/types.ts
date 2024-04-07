@@ -4,11 +4,20 @@ import { FetchBaseQueryError } from '@reduxjs/toolkit/dist/query'
 import { MoonpayEventName, SharedEventName, SwapEventName } from '@uniswap/analytics-events'
 import { Protocol } from '@uniswap/router-sdk'
 import { providers } from 'ethers'
+import { UnitagClaimContext } from 'uniswap/src/features/unitags/types'
 import { TraceProps } from 'utilities/src/telemetry/trace/Trace'
 import { ChainId } from 'wallet/src/constants/chains'
 import { ImportType } from 'wallet/src/features/onboarding/types'
 import { CurrencyField } from 'wallet/src/features/transactions/transactionState/types'
-import { WalletAppsFlyerEvents, WalletEventName } from 'wallet/src/telemetry/constants'
+import { QuoteType } from 'wallet/src/features/transactions/utils'
+import {
+  ExtensionOnboardingEventName,
+  FiatOnRampEventName,
+  InstitutionTransferEventName,
+  UnitagEventName,
+  WalletAppsFlyerEvents,
+  WalletEventName,
+} from 'wallet/src/telemetry/constants'
 
 export type SwapTradeBaseProperties = {
   allowed_slippage_basis_points?: number
@@ -22,6 +31,9 @@ export type SwapTradeBaseProperties = {
   token_in_amount: string
   token_out_amount: string
   fee_amount?: string
+  quoteType?: QuoteType
+  requestId?: string
+  quoteId?: string
 } & TraceProps
 
 type SwapTransactionResultProperties = {
@@ -42,6 +54,7 @@ type SwapTransactionResultProperties = {
   submitViaPrivateRpc?: boolean
   protocol?: Protocol
   transactedUSDValue?: number
+  quoteType?: QuoteType
 }
 
 type TransferProperties = {
@@ -65,6 +78,31 @@ export type SearchResultContextProperties = {
 }
 
 export type WalletEventProperties = {
+  [InstitutionTransferEventName.InstitutionTransferTransactionUpdated]: {
+    status: string
+    externalTransactionId: string
+    institutionName: string
+  }
+  [InstitutionTransferEventName.InstitutionTransferWidgetOpened]: TraceProps & {
+    externalTransactionId: string
+    institutionName: string
+  }
+  [FiatOnRampEventName.FiatOnRampAmountEntered]: TraceProps & { source: 'chip' | 'textInput' }
+  [FiatOnRampEventName.FiatOnRampTokenSelected]: TraceProps & { token: string }
+  [FiatOnRampEventName.FiatOnRampTransactionUpdated]: {
+    status: string
+    externalTransactionId: string
+    serviceProvider: string
+  }
+  [FiatOnRampEventName.FiatOnRampWidgetOpened]: TraceProps & {
+    countryCode: string
+    countryState?: string
+    cryptoCurrency: string
+    externalTransactionId: string
+    fiatCurrency: string
+    preselectedServiceProvider: string
+    serviceProvider: string
+  }
   [SharedEventName.ANALYTICS_SWITCH_TOGGLED]: {
     enabled: boolean
   }
@@ -86,6 +124,9 @@ export type WalletEventProperties = {
   [WalletEventName.PortfolioBalanceFreshnessLag]: {
     freshnessLag: number
     updatedCurrencies: string[]
+  }
+  [WalletEventName.SendRecipientSelected]: {
+    domain: string
   }
   [WalletEventName.SwapSubmitted]: {
     transaction_hash: string
@@ -112,6 +153,9 @@ export type WalletEventProperties = {
     error?: ApolloError | FetchBaseQueryError | SerializedError | Error | string
     txRequest?: providers.TransactionRequest
   } & SwapTradeBaseProperties
+  [SharedEventName.TERMS_OF_SERVICE_ACCEPTED]: {
+    address: string
+  }
   [WalletEventName.TokenSelected]: TraceProps &
     AssetDetailsBaseProperties &
     SearchResultContextProperties & {
@@ -119,6 +163,27 @@ export type WalletEventProperties = {
     }
   [WalletEventName.TransferSubmitted]: TransferProperties
   [WalletEventName.TransferCompleted]: TransferProperties
+  [UnitagEventName.UnitagBannerActionTaken]: {
+    action: 'claim' | 'dismiss'
+    entryPoint: 'home' | 'settings'
+  }
+  [UnitagEventName.UnitagOnboardingActionTaken]: {
+    action: 'select' | 'later'
+  }
+  [UnitagEventName.UnitagChanged]: undefined
+  [UnitagEventName.UnitagClaimAvailabilityDisplayed]: {
+    result: 'unavailable' | 'restricted' | 'available'
+  }
+  [UnitagEventName.UnitagClaimed]: UnitagClaimContext
+  [UnitagEventName.UnitagMetadataUpdated]: {
+    avatar: boolean
+    description: boolean
+    twitter: boolean
+  }
+  [UnitagEventName.UnitagRemoved]: undefined
+  [ExtensionOnboardingEventName.PromoBannerActionTaken]: {
+    action: 'join' | 'dismiss'
+  }
 }
 
 export type WalletAppsFlyerEventProperties = {

@@ -3,11 +3,11 @@ import { ChainId, CurrencyAmount, Percent, Token, TradeType } from '@uniswap/sdk
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { V3Route } from '@uniswap/smart-order-router'
 import { FeeAmount, Pool } from '@uniswap/v3-sdk'
-import { DAI, nativeOnChain, USDC_MAINNET } from 'constants/tokens'
+import { DAI, USDC_MAINNET, nativeOnChain } from 'constants/tokens'
 import { BigNumber } from 'ethers/lib/ethers'
 import JSBI from 'jsbi'
 import { expiryToDeadlineSeconds } from 'state/limit/hooks'
-import { Expiry } from 'state/limit/LimitContext'
+import { Expiry } from 'state/limit/types'
 import { ClassicTrade, DutchOrderTrade, LimitOrderTrade, PreviewTrade, QuoteMethod } from 'state/routing/types'
 
 export const TEST_TOKEN_1 = new Token(1, '0x0000000000000000000000000000000000000001', 18, 'ABC', 'Abc')
@@ -201,5 +201,4 @@ export const LIMIT_ORDER_TRADE = new LimitOrderTrade({
   approveInfo: { needsApprove: false },
   swapper: '0xSwapperAddress',
   deadlineBufferSecs: expiryToDeadlineSeconds(Expiry.Week),
-  nonce: BigNumber.from(0),
 })

@@ -1,13 +1,12 @@
-import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics'
 import { PropsWithChildren, useEffect, useState } from 'react'
-import { Flex, FlexProps } from 'ui/src'
+import { Flex, FlexProps, HapticFeedback } from 'ui/src'
 
 export const AnimateInOrder = ({
   children,
   index,
   animation = 'bouncy',
-  enterStyle = { o: 0, scale: 0.8 },
-  exitStyle = { o: 0, scale: 0.8 },
+  enterStyle = { opacity: 0, scale: 0.8 },
+  exitStyle = { opacity: 0, scale: 0.8 },
   delayMs = 150,
   hapticOnEnter,
   ...rest
@@ -43,7 +42,7 @@ const Delay = ({
   useEffect(() => {
     const showTimer = setTimeout(async () => {
       if (hapticOnEnter) {
-        await impactAsync(ImpactFeedbackStyle.Light)
+        await HapticFeedback.light()
       }
       setDone(true)
     }, by)

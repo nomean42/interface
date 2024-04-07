@@ -1,94 +1,156 @@
 import React from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
+import { Keyboard } from 'react-native'
 import { useAppDispatch } from 'src/app/hooks'
+import { navigate } from 'src/app/navigation/rootNavigation'
 import { openModal } from 'src/features/modals/modalSlice'
-import { Button, Flex, Image, Text, useDeviceDimensions } from 'ui/src'
-import { UNITAGS_BANNER_VERTICAL } from 'ui/src/assets'
-import { ElementName, ModalName } from 'wallet/src/telemetry/constants'
+import { Screens, UnitagScreens } from 'src/screens/Screens'
+import {
+  Flex,
+  Image,
+  Text,
+  TouchableArea,
+  TouchableAreaProps,
+  useDeviceDimensions,
+  useIsDarkMode,
+} from 'ui/src'
+import { UNITAGS_BANNER_VERTICAL_DARK, UNITAGS_BANNER_VERTICAL_LIGHT } from 'ui/src/assets'
+import { iconSizes } from 'ui/src/theme'
+import { selectHasCompletedUnitagsIntroModal } from 'wallet/src/features/behaviorHistory/selectors'
+import { setHasSkippedUnitagPrompt } from 'wallet/src/features/behaviorHistory/slice'
+import { UNITAG_SUFFIX_NO_LEADING_DOT } from 'wallet/src/features/unitags/constants'
+import { useAppSelector } from 'wallet/src/state'
+import { sendWalletAnalyticsEvent } from 'wallet/src/telemetry'
+import { ElementName, ModalName, UnitagEventName } from 'wallet/src/telemetry/constants'
 
-const IMAGE_ASPECT_RATIO = 0.4
-const IMAGE_SCREEN_WIDTH_PROPORTION = 0.2
-const COMPACT_IMAGE_SCREEN_WIDTH_PROPORTION = 0.16
+const IMAGE_ASPECT_RATIO = 0.42
+const IMAGE_SCREEN_WIDTH_PROPORTION = 0.18
+const COMPACT_IMAGE_SCREEN_WIDTH_PROPORTION = 0.15
 
-export function UnitagBanner({ compact }: { compact?: boolean }): JSX.Element {
+export function UnitagBanner({
+  address,
+  compact,
+  entryPoint,
+}: {
+  address: Address
+  compact?: boolean
+  entryPoint: Screens.Home | Screens.Settings
+}): JSX.Element {
   const dispatch = useAppDispatch()
   const { t } = useTranslation()
   const { fullWidth } = useDeviceDimensions()
+  const isDarkMode = useIsDarkMode()
+  const hasCompletedUnitagsIntroModal = useAppSelector(selectHasCompletedUnitagsIntroModal)
+
   const imageWidth = compact
     ? COMPACT_IMAGE_SCREEN_WIDTH_PROPORTION * fullWidth
     : IMAGE_SCREEN_WIDTH_PROPORTION * fullWidth
   const imageHeight = imageWidth / IMAGE_ASPECT_RATIO
+  const analyticsEntryPoint = entryPoint === Screens.Home ? 'home' : 'settings'
 
   const onPressClaimNow = (): void => {
-    dispatch(openModal({ name: ModalName.UnitagsIntro }))
+    Keyboard.dismiss()
+    sendWalletAnalyticsEvent(UnitagEventName.UnitagBannerActionTaken, {
+      action: 'claim',
+      entryPoint: analyticsEntryPoint,
+    })
+
+    if (hasCompletedUnitagsIntroModal) {
+      navigate(Screens.UnitagStack, {
+        screen: UnitagScreens.ClaimUnitag,
+        params: {
+          entryPoint,
+          address,
+        },
+      })
+    } else {
+      dispatch(openModal({ name: ModalName.UnitagsIntro, initialState: { address, entryPoint } }))
+    }
   }
 
   const onPressMaybeLater = (): void => {
-    // TODO (MOB-1554): set a flag in redux to not show this again
+    sendWalletAnalyticsEvent(UnitagEventName.UnitagBannerActionTaken, {
+      action: 'dismiss',
+      entryPoint: analyticsEntryPoint,
+    })
+    dispatch(setHasSkippedUnitagPrompt(true))
+  }
+
+  const baseButtonStyle: TouchableAreaProps = {
+    backgroundColor: '$accent1',
+    borderRadius: '$rounded20',
+    justifyContent: 'center',
+    height: iconSizes.icon36,
+    py: '$spacing8',
+    px: '$spacing12',
   }
 
   return (
     <Flex
       grow
       row
+      alignContent="space-between"
       backgroundColor={compact ? '$surface2' : '$background'}
       borderColor="$surface3"
-      borderRadius="$rounded16"
+      borderRadius="$rounded20"
       borderWidth={compact ? undefined : '$spacing1'}
       mt="$spacing12"
       overflow="hidden"
+      pl="$spacing16"
+      py="$spacing12"
       shadowColor="$neutral3"
       shadowOpacity={0.4}
       shadowRadius="$spacing4">
       {compact ? (
         <Flex
           fill
+          row
           $short={{ mr: '$spacing32' }}
-          gap="$spacing16"
           justifyContent="space-between"
-          p="$spacing16"
           onPress={onPressClaimNow}>
-          <Flex row gap="$none">
-            <Text color="$neutral2" variant="subheading2">
-              <Text color="$accent1" variant="buttonLabel3">
-                {t('Claim a username ')}
-              </Text>
-              {t('to create a public username and customizable profile.')}
-            </Text>
-          </Flex>
+          <Text color="$neutral2" variant="subheading2">
+            <Trans
+              components={{ highlight: <Text color="$accent1" variant="buttonLabel3" /> }}
+              i18nKey="unitags.banner.title.compact"
+              values={{ unitagDomain: UNITAG_SUFFIX_NO_LEADING_DOT }}
+            />
+          </Text>
         </Flex>
       ) : (
-        <Flex fill gap="$spacing16" justifyContent="space-between" p="$spacing16">
-          <Flex gap="$spacing8">
-            <Text variant="subheading2">{t('Claim your Uniswap username')}</Text>
+        <Flex fill gap="$spacing16" justifyContent="space-between">
+          <Flex gap="$spacing4">
+            <Text variant="subheading2">
+              {t('unitags.banner.title.full', {
+                unitagDomain: UNITAG_SUFFIX_NO_LEADING_DOT,
+              })}
+            </Text>
             <Text color="$neutral2" variant="body3">
-              {t(
-                'Get a free username and personalized profile so people can find your across web3'
-              )}
+              {t('unitags.banner.subtitle')}
             </Text>
           </Flex>
-          <Flex row gap="$spacing8">
-            <Button
-              borderRadius="$rounded24"
-              fontSize="$small"
+          <Flex row gap="$spacing2">
+            {/* TODO: replace with Button when it's extensible enough to accommodate designs */}
+            <TouchableArea
+              {...baseButtonStyle}
               testID={ElementName.Confirm}
-              theme="primary"
               onPress={onPressClaimNow}>
-              {t('Claim now')}
-            </Button>
-            <Button
-              borderRadius="$rounded24"
-              color="$neutral2"
-              fontSize="$small"
+              <Text color="white" variant="buttonLabel4">
+                {t('unitags.banner.button.claim')}
+              </Text>
+            </TouchableArea>
+            <TouchableArea
+              {...baseButtonStyle}
+              backgroundColor="$transparent"
               testID={ElementName.Cancel}
-              theme="secondary"
               onPress={onPressMaybeLater}>
-              {t('Maybe later')}
-            </Button>
+              <Text color="$neutral2" variant="buttonLabel4">
+                {t('common.button.later')}
+              </Text>
+            </TouchableArea>
           </Flex>
         </Flex>
       )}
-      <Flex centered width={imageWidth}>
+      <Flex mr={compact ? -(imageWidth / 6) : -(imageWidth / 12)} width={imageWidth}>
         <Image
           alignSelf="center"
           position="absolute"
@@ -96,8 +158,9 @@ export function UnitagBanner({ compact }: { compact?: boolean }): JSX.Element {
           source={{
             width: imageWidth,
             height: imageHeight,
-            uri: UNITAGS_BANNER_VERTICAL,
+            uri: isDarkMode ? UNITAGS_BANNER_VERTICAL_DARK : UNITAGS_BANNER_VERTICAL_LIGHT,
           }}
+          top={compact ? -(imageHeight * 0.19) : -(imageHeight * 0.22)}
         />
       </Flex>
     </Flex>

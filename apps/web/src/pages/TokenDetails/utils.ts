@@ -1,19 +1,18 @@
 import { t } from '@lingui/macro'
-import { TokenQuery } from 'graphql/data/__generated__/types-and-hooks'
+import { Currency } from '@uniswap/sdk-core'
 
-export const getTokenPageTitle = (tokenQuery: TokenQuery, omitSearchDetail?: boolean) => {
-  const tokenName = tokenQuery?.token?.name
-  const tokenSymbol = tokenQuery?.token?.symbol
-  const baseTitle = 'Buy & Trade'
-  const searchDetail = omitSearchDetail ? '' : ': Live Price & Chart on Uniswap'
+export const getTokenPageTitle = (currency?: Currency) => {
+  const tokenName = currency?.name
+  const tokenSymbol = currency?.symbol
+  const baseTitle = t`Buy, sell, and trade on Uniswap`
   if (!tokenName && !tokenSymbol) {
-    return t`${baseTitle}${searchDetail}`
+    return baseTitle
   }
   if (!tokenName && tokenSymbol) {
-    return t`${baseTitle} ${tokenSymbol}${searchDetail}`
+    return t`${tokenSymbol}: ${baseTitle}`
   }
   if (tokenName && !tokenSymbol) {
-    return t`${baseTitle} ${tokenName}${searchDetail}`
+    return t`${tokenName}: ${baseTitle}`
   }
-  return t`${baseTitle} ${tokenName} (${tokenSymbol})${searchDetail}`
+  return t`${tokenName} (${tokenSymbol}): ${baseTitle}`
 }

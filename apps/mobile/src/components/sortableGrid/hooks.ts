@@ -1,8 +1,8 @@
 import { useCallback, useRef } from 'react'
 import { FlatList, ScrollView } from 'react-native'
-import { runOnJS, SharedValue, useAnimatedReaction, useSharedValue } from 'react-native-reanimated'
-import { AUTO_SCROLL_THRESHOLD } from './constants'
+import { SharedValue, runOnJS, useAnimatedReaction, useSharedValue } from 'react-native-reanimated'
 import { useSortableGridContext } from './SortableGridProvider'
+import { AUTO_SCROLL_THRESHOLD } from './constants'
 import { ItemMeasurements } from './types'
 
 export function useStableCallback<
@@ -30,6 +30,9 @@ export function useAnimatedZIndex(renderIndex: number): SharedValue<number> {
       previousActiveIndex: previousActiveIndexValue.value,
     }),
     ({ touchedIndex, previousActiveIndex }) => {
+      if (touchedIndex === null) {
+        return null
+      }
       if (renderIndex === touchedIndex) {
         // Display the currently touched item on top of all other items
         zIndexValue.value = 10000

@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
-import { Flex, Icons, Text, useSporeColors } from 'ui/src'
+import { Button, Flex, Icons, Text, isWeb, useSporeColors } from 'ui/src'
 import { iconSizes } from 'ui/src/theme'
+import { CurrencyInfo } from 'uniswap/src/features/dataApi/types'
 import { NumberType } from 'utilities/src/format/types'
 import { CurrencyLogo } from 'wallet/src/components/CurrencyLogo/CurrencyLogo'
-import { CurrencyInfo } from 'wallet/src/features/dataApi/types'
 import { useLocalizationContext } from 'wallet/src/features/language/LocalizationContext'
 import { DerivedSwapInfo } from 'wallet/src/features/transactions/swap/types'
 import { CurrencyField } from 'wallet/src/features/transactions/transactionState/types'
@@ -12,9 +12,11 @@ import { getSymbolDisplayText } from 'wallet/src/utils/currency'
 export function TransactionAmountsReview({
   acceptedDerivedSwapInfo,
   newTradeRequiresAcceptance,
+  onClose,
 }: {
   acceptedDerivedSwapInfo: DerivedSwapInfo<CurrencyInfo, CurrencyInfo>
   newTradeRequiresAcceptance: boolean
+  onClose: () => void
 }): JSX.Element {
   const { t } = useTranslation()
   const colors = useSporeColors()
@@ -88,9 +90,23 @@ export function TransactionAmountsReview({
 
   return (
     <Flex $short={{ gap: '$spacing8' }} gap="$spacing16" ml="$spacing12" mr="$spacing12">
-      <Text color="$neutral2" variant="body2">
-        {t('You’re swapping')}
-      </Text>
+      <Flex row alignItems="center">
+        <Flex fill>
+          <Text color="$neutral2" variant="body2">
+            {t('swap.review.summary')}
+          </Text>
+        </Flex>
+        {isWeb && (
+          <Button
+            backgroundColor="$transparent"
+            color="$neutral2"
+            icon={<Icons.X size="$icon.20" />}
+            p="$none"
+            theme="secondary"
+            onClick={onClose}
+          />
+        )}
+      </Flex>
 
       <CurrencyValueWithIcon
         currencyInfo={currencyInInfo}

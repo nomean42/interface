@@ -1,40 +1,50 @@
 import '@testing-library/jest-dom' // jest custom assertions
 import '@vanilla-extract/css/disableRuntimeStyles' // https://vanilla-extract.style/documentation/test-environments/#disabling-runtime-styles
-import 'polyfills'
 import 'jest-styled-components' // adds style diffs to snapshot tests
-import 'polyfills'
+import 'polyfills' // add polyfills
 
 import type { createPopper } from '@popperjs/core'
 import { useWeb3React } from '@web3-react/core'
 import failOnConsole from 'jest-fail-on-console'
 import { disableNetConnect, restore as restoreNetConnect } from 'nock'
+import React from 'react'
 import { Readable } from 'stream'
 import { toBeVisible } from 'test-utils/matchers'
 import { mocked } from 'test-utils/mocked'
+import { useFeatureFlag } from 'uniswap/src/features/experiments/hooks'
 import { TextDecoder, TextEncoder } from 'util'
-
-window.open = jest.fn()
-window.getComputedStyle = jest.fn()
-
-if (typeof globalThis.TextEncoder === 'undefined') {
-  globalThis.ReadableStream = Readable as unknown as typeof globalThis.ReadableStream
-  globalThis.TextEncoder = TextEncoder
-  globalThis.TextDecoder = TextDecoder as typeof globalThis.TextDecoder
-}
 
 // Sets origin to the production origin, because some tests depend on this.
 // This prevents each test file from needing to set this manually.
 globalThis.origin = 'https://app.uniswap.org'
 
-globalThis.matchMedia =
-  globalThis.matchMedia ||
-  (() => {
-    return {
-      matches: false,
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-    }
-  })
+// Polyfill browser APIs (jest is a node.js environment):
+{
+  window.open = jest.fn()
+  window.getComputedStyle = jest.fn()
+
+  if (typeof globalThis.TextEncoder === 'undefined') {
+    globalThis.ReadableStream = Readable as unknown as typeof globalThis.ReadableStream
+    globalThis.TextEncoder = TextEncoder
+    globalThis.TextDecoder = TextDecoder as typeof globalThis.TextDecoder
+  }
+
+  globalThis.matchMedia =
+    globalThis.matchMedia ||
+    (() => {
+      return {
+        matches: false,
+        addListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }
+    })
+
+  globalThis.performance.measure = jest.fn()
+  globalThis.performance.mark = jest.fn()
+
+  globalThis.React = React
+}
 
 jest.mock('@popperjs/core', () => {
   const core = jest.requireActual('@popperjs/core')
@@ -109,6 +119,8 @@ jest.mock('state/routing/quickRouteSlice', () => {
   }
 })
 
+jest.mock('uniswap/src/features/experiments/hooks')
+
 // Mocks are configured to reset between tests (by CRA), so they must be set in a beforeEach.
 beforeEach(() => {
   // Mock window.getComputedStyle, because it is otherwise too computationally expensive to unit test.
@@ -120,6 +132,9 @@ beforeEach(() => {
 
   // Disable network connections by default.
   disableNetConnect()
+
+  // Mock feature flags
+  mocked(useFeatureFlag).mockReturnValue(false)
 })
 
 afterEach(() => {

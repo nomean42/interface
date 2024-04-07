@@ -20,7 +20,7 @@ const StyledGasIcon = styled(Gas)`
   width: 16px;
   // We apply the following to all children of the SVG in order to override the default color
   & > * {
-    fill: ${({ theme }) => theme.neutral2};
+    fill: ${({ theme }) => theme.neutral3};
   }
 `
 
@@ -66,7 +66,7 @@ export default function GasEstimateTooltip({ trade, loading }: { trade?: Submitt
                 </div>
               )}
 
-              {isUniswapXTrade(trade) && (
+              {isUniswapXTrade(trade) && (trade.classicGasUseEstimateUSD ?? 0) > 0 && (
                 <div>
                   <s>
                     {formatNumber({

@@ -16,8 +16,8 @@ export const UnitagWithProfilePicture = ({
     <Flex centered gap={-spacing.spacing24}>
       <UnitagProfilePicture
         address={address}
-        profilePictureUri={profilePictureUri}
         size={imageSizes.image100}
+        unitagAvatarUri={profilePictureUri}
       />
       <Flex
         row
@@ -30,9 +30,9 @@ export const UnitagWithProfilePicture = ({
         shadowRadius="$spacing4"
         transform={[{ rotateZ: '-2deg' }]}
         zIndex="$popover">
-        <Text color="$accent1" variant="buttonLabel1">
+        <Text color="$accent1" variant="subheading1">
           {unitag}
-          <Text color="$neutral2" variant="buttonLabel1">
+          <Text color="$neutral3" variant="subheading1">
             {UNITAG_SUFFIX}
           </Text>
         </Text>

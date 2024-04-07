@@ -8,6 +8,8 @@ import { useIsDarkMode } from 'theme/components/ThemeToggle'
 import { ReactComponent as arbitrum } from './ChainSymbols/arbitrum.svg'
 import { ReactComponent as avax } from './ChainSymbols/avax.svg'
 import { ReactComponent as base } from './ChainSymbols/base.svg'
+import { ReactComponent as blast } from './ChainSymbols/blast.svg'
+import { ReactComponent as blastLight } from './ChainSymbols/blast_light.svg'
 import { ReactComponent as bnb } from './ChainSymbols/bnb.svg'
 import { ReactComponent as celo } from './ChainSymbols/celo.svg'
 import { ReactComponent as celoLight } from './ChainSymbols/celo_light.svg'
@@ -81,6 +83,18 @@ export function getChainUI(chainId: ChainId, darkMode: boolean): ChainUI | undef
         bgColor: '#0052FF33',
         textColor: '#0052FF',
       }
+    case ChainId.BLAST:
+      return darkMode
+        ? {
+            Symbol: blast,
+            bgColor: 'rgba(252, 252, 3, 0.12)',
+            textColor: 'rgba(252, 252, 3, 1) ',
+          }
+        : {
+            Symbol: blastLight,
+            bgColor: 'rgba(252, 252, 3, 0.16)',
+            textColor: 'rgba(17, 20, 12, 1)',
+          }
     default:
       return undefined
   }
@@ -95,14 +109,16 @@ type ChainLogoProps = {
   borderRadius?: number
   style?: CSSProperties
   testId?: string
+  fillContainer?: boolean
 }
 export function ChainLogo({
   chainId,
   className,
   style,
-  size = 16,
+  size = 12,
   borderRadius = getDefaultBorderRadius(size),
   testId,
+  fillContainer = false,
 }: ChainLogoProps) {
   const darkMode = useIsDarkMode()
   const { surface2 } = useTheme()
@@ -111,12 +127,21 @@ export function ChainLogo({
   const { label } = getChainInfo(chainId)
 
   const { Symbol, bgColor } = getChainUI(chainId, darkMode)
+  const iconSize = fillContainer ? '100%' : size
+
   return (
-    <svg width={size} height={size} className={className} style={style} aria-labelledby="titleID" data-testid={testId}>
+    <svg
+      width={iconSize}
+      height={iconSize}
+      className={className}
+      style={{ ...style, width: iconSize, height: iconSize }}
+      aria-labelledby="titleID"
+      data-testid={testId}
+    >
       <title id="titleID">{`${label} logo`}</title>
-      <rect rx={borderRadius} fill={surface2} width={size} height={size} />
-      <rect rx={borderRadius} fill={bgColor} width={size} height={size} />
-      <Symbol width={size} height={size} />
+      <rect rx={borderRadius} fill={surface2} width={iconSize} height={iconSize} />
+      <rect rx={borderRadius} fill={bgColor} width={iconSize} height={iconSize} />
+      <Symbol width={iconSize} height={iconSize} />
     </svg>
   )
 }

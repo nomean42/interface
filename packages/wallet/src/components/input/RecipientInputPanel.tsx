@@ -26,12 +26,7 @@ export function RecipientInputPanel({
       onPress={onToggleShowRecipientSelector}>
       <Flex gap="$spacing8" py="$spacing24">
         <Flex centered row gap="$spacing4">
-          <AddressDisplay
-            hideAddressInSubtitle
-            includeUnitagSuffix
-            address={recipientAddress}
-            variant="heading3"
-          />
+          <AddressDisplay hideAddressInSubtitle address={recipientAddress} variant="heading3" />
           <Icons.RotatableChevron color="$neutral1" direction="end" />
         </Flex>
 
@@ -49,9 +44,7 @@ export function RecipientPrevTransfers({ recipient }: { recipient: string }): JS
 
   return (
     <Text color="$neutral2" textAlign="center" variant="subheading2">
-      {prevTxnsCount === 1
-        ? t('{{ prevTxnsCount }} previous transfer', { prevTxnsCount })
-        : t('{{ prevTxnsCount }} previous transfers', { prevTxnsCount })}
+      {t('send.recipient.previous', { count: prevTxnsCount })}
     </Text>
   )
 }

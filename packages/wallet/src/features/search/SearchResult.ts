@@ -1,5 +1,5 @@
+import { SafetyLevel } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 import { ChainId } from 'wallet/src/constants/chains'
-import { SafetyLevel } from 'wallet/src/data/__generated__/types-and-hooks'
 
 export type SearchResult =
   | TokenSearchResult
@@ -7,11 +7,23 @@ export type SearchResult =
   | EtherscanSearchResult
   | NFTCollectionSearchResult
 
+// Retain original ordering as these are saved to storage and loaded back out
 export enum SearchResultType {
-  Wallet,
+  ENSAddress,
   Token,
   Etherscan,
   NFTCollection,
+  Unitag,
+  WalletByAddress,
+}
+
+export function extractDomain(walletName: string, type: SearchResultType): string {
+  const index = walletName.indexOf('.')
+  if (index === -1 || index === walletName.length - 1) {
+    return type === SearchResultType.Unitag ? '.uni.eth' : '.eth'
+  }
+
+  return walletName.substring(index + 1)
 }
 
 export interface SearchResultBase {
@@ -19,11 +31,28 @@ export interface SearchResultBase {
   searchId?: string
 }
 
-export interface WalletSearchResult extends SearchResultBase {
-  type: SearchResultType.Wallet
+export type WalletSearchResult =
+  | ENSAddressSearchResult
+  | UnitagSearchResult
+  | WalletByAddressSearchResult
+
+export interface WalletByAddressSearchResult extends SearchResultBase {
+  type: SearchResultType.WalletByAddress
   address: Address
-  ensName?: string
+}
+
+export interface ENSAddressSearchResult extends SearchResultBase {
+  type: SearchResultType.ENSAddress
+  address: Address
+  isRawName?: boolean
+  ensName: string
   primaryENSName?: string
+}
+
+export interface UnitagSearchResult extends SearchResultBase {
+  type: SearchResultType.Unitag
+  address: Address
+  unitag: string
 }
 
 export interface TokenSearchResult extends SearchResultBase {

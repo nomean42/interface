@@ -8,16 +8,16 @@ import {
   AnimatedBottomSheetFlashList,
   AnimatedFlashList,
   Flex,
+  Icons,
   Loader,
   useDeviceDimensions,
   useSporeColors,
 } from 'ui/src'
-import NoNFTsIcon from 'ui/src/assets/icons/empty-state-picture.svg'
+import { useNftsTabQuery } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
+import { GQLQueries } from 'uniswap/src/data/graphql/uniswap-data-api/queries'
 import { BaseCard } from 'wallet/src/components/BaseCard/BaseCard'
 import { HiddenNftsRowLeft, HiddenNftsRowRight } from 'wallet/src/components/nfts/NFTHiddenRow'
-import { GQLQueries } from 'wallet/src/data/queries'
 import { isError, isNonPollingRequestInFlight } from 'wallet/src/data/utils'
-import { useNftsTabQuery } from 'wallet/src/data/__generated__/types-and-hooks'
 import {
   EMPTY_NFT_ITEM,
   ESTIMATED_NFT_LIST_ITEM_SIZE,
@@ -31,6 +31,7 @@ import { sendWalletAnalyticsEvent } from 'wallet/src/telemetry'
 import { WalletEventName } from 'wallet/src/telemetry/constants'
 
 export const NFTS_TAB_DATA_DEPENDENCIES = [GQLQueries.NftsTab]
+export const NUM_FIRST_NFTS = 30
 
 const PREFETCH_ITEMS_THRESHOLD = 0.5
 const LOADING_ITEM = 'loading'
@@ -84,7 +85,7 @@ export const NftsList = forwardRef<FlashList<unknown>, NftsListProps>(function _
   const [hiddenNftsExpanded, setHiddenNftsExpanded] = useState(false)
 
   const { data, fetchMore, refetch, networkStatus } = useNftsTabQuery({
-    variables: { ownerAddress: owner, first: 30, filter: { filterSpam: false } },
+    variables: { ownerAddress: owner, first: NUM_FIRST_NFTS, filter: { filterSpam: false } },
     notifyOnNetworkStatusChange: true, // Used to trigger network state / loading on refetch or fetchMore
     errorPolicy: 'all', // Suppress non-null image.url fields from backend
   })
@@ -106,11 +107,7 @@ export const NftsList = forwardRef<FlashList<unknown>, NftsListProps>(function _
     })
   }, [data?.nftBalances?.pageInfo?.endCursor, data?.nftBalances?.pageInfo?.hasNextPage, fetchMore])
 
-  const { nfts, numHidden, numShown } = useGroupNftsByVisibility(
-    nftDataItems,
-    hiddenNftsExpanded,
-    owner
-  )
+  const { nfts, numHidden, numShown } = useGroupNftsByVisibility(nftDataItems, hiddenNftsExpanded)
 
   const onHiddenRowPressed = useCallback((): void => {
     if (hiddenNftsExpanded && footerHeight) {
@@ -170,9 +167,9 @@ export const NftsList = forwardRef<FlashList<unknown>, NftsListProps>(function _
         isError(networkStatus, !!data) ? (
           <Flex centered grow style={errorStateStyle}>
             <BaseCard.ErrorState
-              description={t('Something went wrong.')}
-              retryButtonLabel={t('Retry')}
-              title={t('Couldn’t load NFTs')}
+              description={t('common.error.general')}
+              retryButtonLabel={t('common.button.retry')}
+              title={t('tokens.nfts.list.error.load.title')}
               onRetry={onRetry}
             />
           </Flex>
@@ -180,14 +177,22 @@ export const NftsList = forwardRef<FlashList<unknown>, NftsListProps>(function _
           // empty view
           <Flex centered grow style={emptyStateStyle}>
             <BaseCard.EmptyState
-              buttonLabel={isExternalProfile || !onPressEmptyState ? undefined : t('Receive NFTs')}
+              buttonLabel={
+                isExternalProfile || !onPressEmptyState
+                  ? undefined
+                  : t('tokens.nfts.list.none.button')
+              }
               description={
                 isExternalProfile
-                  ? t('When this wallet buys or receives NFTs, they’ll appear here.')
-                  : t('Transfer NFTs from another wallet to get started.')
+                  ? t('tokens.nfts.list.none.description.external')
+                  : t('tokens.nfts.list.none.description.default')
               }
-              icon={<NoNFTsIcon color={colors.neutral3.get()} />}
-              title={t('No NFTs yet')}
+              icon={
+                <Flex pb="$spacing12">
+                  <Icons.EmptyStatePicture color={colors.neutral3.get()} size="$icon.70" />
+                </Flex>
+              }
+              title={t('tokens.nfts.list.none.title')}
               onPress={onPressEmptyState}
             />
           </Flex>
@@ -195,12 +200,10 @@ export const NftsList = forwardRef<FlashList<unknown>, NftsListProps>(function _
       }
       // we add a footer to cover any possible space, so user can scroll the top menu all the way to the top
       ListFooterComponent={
-        ListFooterComponent ? (
-          <>
-            {networkStatus === NetworkStatus.fetchMore && <Loader.NFT repeat={6} />}
-            {ListFooterComponent}
-          </>
-        ) : undefined
+        <>
+          {networkStatus === NetworkStatus.fetchMore && <Loader.NFT repeat={6} />}
+          {ListFooterComponent}
+        </>
       }
       data={shouldAddInLoadingItem ? [...nfts, LOADING_ITEM] : nfts}
       estimatedItemSize={ESTIMATED_NFT_LIST_ITEM_SIZE}

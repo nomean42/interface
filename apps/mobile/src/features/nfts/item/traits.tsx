@@ -2,7 +2,7 @@ import React from 'react'
 import { FlatList, ListRenderItemInfo, StyleSheet } from 'react-native'
 import { Flex, Text, useSporeColors } from 'ui/src'
 import { spacing } from 'ui/src/theme'
-import { NftAssetTrait } from 'wallet/src/data/__generated__/types-and-hooks'
+import { NftAssetTrait } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
 
 export function NFTTraitCard({
   trait,
@@ -13,7 +13,12 @@ export function NFTTraitCard({
 }): JSX.Element {
   const colors = useSporeColors()
   return (
-    <Flex bg="$surface3" borderRadius="$rounded16" gap="$spacing4" px="$spacing16" py="$spacing12">
+    <Flex
+      backgroundColor="$surface3"
+      borderRadius="$rounded16"
+      gap="$spacing4"
+      px="$spacing16"
+      py="$spacing12">
       <Text
         fontSize={14}
         style={{ color: titleTextColor ?? colors.neutral2.get() }}

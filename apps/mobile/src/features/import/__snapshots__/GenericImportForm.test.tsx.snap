@@ -6,7 +6,6 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
   onTouchEnd={[Function]}
   style={
     {
-      "alignItems": "stretch",
       "flexDirection": "column",
       "gap": 12,
     }
@@ -15,7 +14,6 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
   <View
     style={
       {
-        "alignItems": "stretch",
         "backgroundColor": "#FFFFFF",
         "borderBottomColor": "#2222220D",
         "borderBottomLeftRadius": 20,
@@ -57,7 +55,7 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
         autoCorrect={false}
         autoFocus={true}
         blurOnSubmit={false}
-        editable={true}
+        focusVisibleStyle={{}}
         focusable={true}
         maxFontSizeMultiplier={1.4}
         multiline={true}
@@ -65,7 +63,6 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
         onChangeText={[Function]}
         onFocus={[Function]}
         onSubmitEditing={[Function]}
-        outlineWidth={0}
         placeholderTextColor="#CECECE"
         returnKeyType="done"
         scrollEnabled={false}
@@ -102,7 +99,7 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
             "width": 8,
           }
         }
-        testID="import_account_form/input"
+        testID="import-account-input"
         textAlignVertical="bottom"
       />
     </View>
@@ -154,7 +151,6 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
       <View
         style={
           {
-            "alignItems": "stretch",
             "flexDirection": "column",
             "paddingTop": 64,
             "position": "absolute",
@@ -163,41 +159,18 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
         }
       >
         <View
-          accessibilityState={
-            {
-              "busy": undefined,
-              "checked": undefined,
-              "disabled": undefined,
-              "expanded": undefined,
-              "selected": undefined,
-            }
-          }
-          accessibilityValue={
-            {
-              "max": undefined,
-              "min": undefined,
-              "now": undefined,
-              "text": undefined,
-            }
-          }
-          accessible={true}
-          collapsable={false}
+          cancelable={true}
+          disabled={false}
           focusable={true}
-          hitSlop={
-            {
-              "bottom": 5,
-              "left": 5,
-              "right": 5,
-              "top": 5,
-            }
-          }
-          onClick={[Function]}
-          onResponderGrant={[Function]}
-          onResponderMove={[Function]}
-          onResponderRelease={[Function]}
-          onResponderTerminate={[Function]}
-          onResponderTerminationRequest={[Function]}
-          onStartShouldSetResponder={[Function]}
+          hitSlop={[Function]}
+          minPressDuration={0}
+          onBlur={[Function]}
+          onFocus={[Function]}
+          onMouseEnter={[Function]}
+          onMouseLeave={[Function]}
+          onPress={[Function]}
+          onPressIn={[Function]}
+          onPressOut={[Function]}
           style={
             {
               "backgroundColor": "#FFEFFF",
@@ -205,12 +178,17 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
               "borderBottomRightRadius": 12,
               "borderTopLeftRadius": 12,
               "borderTopRightRadius": 12,
-              "onPressIn": undefined,
+              "flexDirection": "column",
               "opacity": 1,
               "paddingBottom": 8,
               "paddingLeft": 8,
               "paddingRight": 8,
               "paddingTop": 8,
+              "transform": [
+                {
+                  "scale": 1,
+                },
+              ],
             }
           }
         >
@@ -231,7 +209,7 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
                 {
                   "color": "#FC72FF",
                   "fontFamily": "Basel-Medium",
-                  "fontSize": 13,
+                  "fontSize": 15,
                   "fontWeight": "500",
                   "lineHeight": 16,
                 }
@@ -309,7 +287,6 @@ exports[`GenericImportForm renders a placeholder when there is no value 1`] = `
   <View
     style={
       {
-        "alignItems": "stretch",
         "flexDirection": "column",
       }
     }

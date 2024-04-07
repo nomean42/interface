@@ -5,10 +5,14 @@ import { getBlockExplorerIcon } from 'src/components/icons/BlockExplorerIcon'
 import { Flex, Text } from 'ui/src'
 import GlobeIcon from 'ui/src/assets/icons/globe-filled.svg'
 import TwitterIcon from 'ui/src/assets/icons/x-twitter.svg'
-import { ChainId } from 'wallet/src/constants/chains'
-import { TokenDetailsScreenQuery } from 'wallet/src/data/__generated__/types-and-hooks'
+import { TokenDetailsScreenQuery } from 'uniswap/src/data/graphql/uniswap-data-api/__generated__/types-and-hooks'
+import { CHAIN_INFO, ChainId } from 'wallet/src/constants/chains'
 import { ElementName } from 'wallet/src/telemetry/constants'
-import { currencyIdToAddress, currencyIdToChain } from 'wallet/src/utils/currencyId'
+import {
+  currencyIdToAddress,
+  currencyIdToChain,
+  isDefaultNativeAddress,
+} from 'wallet/src/utils/currencyId'
 import { ExplorerDataType, getExplorerLink, getTwitterLink } from 'wallet/src/utils/linking'
 import { LinkButton, LinkButtonType } from './LinkButton'
 
@@ -25,13 +29,13 @@ export function TokenDetailsLinks({
   const chainId = currencyIdToChain(currencyId) ?? ChainId.Mainnet
   const address = currencyIdToAddress(currencyId)
   const explorerLink = getExplorerLink(chainId, address, ExplorerDataType.TOKEN)
+  const explorerName = CHAIN_INFO[chainId].explorer.name
 
   return (
-    // eslint-disable-next-line react-native/no-inline-styles
     <View style={{ marginHorizontal: -14 }}>
       <Flex gap="$spacing8">
         <Text color="$neutral2" mx="$spacing16" variant="subheading2">
-          {t('Links')}
+          {t('token.links.title')}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <Flex row gap="$spacing8" px="$spacing16">
@@ -39,7 +43,7 @@ export function TokenDetailsLinks({
               Icon={getBlockExplorerIcon(chainId)}
               buttonType={LinkButtonType.Link}
               element={ElementName.TokenLinkEtherscan}
-              label={t('Contract')}
+              label={explorerName}
               value={explorerLink}
             />
             {homepageUrl && (
@@ -47,7 +51,7 @@ export function TokenDetailsLinks({
                 Icon={GlobeIcon}
                 buttonType={LinkButtonType.Link}
                 element={ElementName.TokenLinkWebsite}
-                label={t('Website')}
+                label={t('token.links.website')}
                 value={homepageUrl}
               />
             )}
@@ -56,8 +60,16 @@ export function TokenDetailsLinks({
                 Icon={TwitterIcon}
                 buttonType={LinkButtonType.Link}
                 element={ElementName.TokenLinkTwitter}
-                label={t('X')}
+                label={t('token.links.twitter')}
                 value={getTwitterLink(twitterName)}
+              />
+            )}
+            {!isDefaultNativeAddress(address) && (
+              <LinkButton
+                buttonType={LinkButtonType.Copy}
+                element={ElementName.Copy}
+                label={t('token.links.contract')}
+                value={address}
               />
             )}
           </Flex>
